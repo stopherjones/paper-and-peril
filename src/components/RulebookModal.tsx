@@ -41,7 +41,7 @@ export const RulebookModal: React.FC<RulebookModalProps> = ({ onClose }) => {
               <Compass className="w-4 h-4 text-amber-400" /> 4x4 Floor Grid & Hidden Room Cards
             </h3>
             <p>
-              Each dungeon floor is a <strong>4x4 board containing 16 predetermined room tiles</strong> laid face-down. You begin at the entrance Hearth [1,1]. As you explore, you turn over cards to reveal their perils or treasures.
+              Each dungeon floor is a <strong>4x4 board containing 16 pre-determined room tiles</strong> laid face-down. You begin at the entrance Hearth [1,1]. As you explore, you turn over cards to reveal their perils or treasures.
             </p>
             <ul className="list-disc list-inside mt-2 space-y-1 text-stone-300">
               <li>
