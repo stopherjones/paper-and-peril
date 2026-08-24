@@ -5,8 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    // Relative URLs work both at localhost and under a GitHub Pages project path.
-    base: './',
+    // Set the base path to match the GitHub Pages repository name
+    base: '/paper-and-peril/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
