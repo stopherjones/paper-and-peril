@@ -286,9 +286,8 @@ export const DieShape: React.FC<DieShapeProps> = ({
               ease: 'easeInOut',
             }
           : {
-              type: 'spring',
-              stiffness: 300,
-              damping: 15,
+              duration: 0.45,
+              ease: 'easeOut',
             }
       }
     >

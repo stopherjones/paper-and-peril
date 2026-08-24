@@ -32,7 +32,7 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ hero, onConfirmLevel
   return (
     <div
       id="level-up-modal-overlay"
-      className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
     >
       <div className="bg-gradient-to-b from-[#382618] to-[#1e140c] border-4 border-[#dfb15b] rounded-xl max-w-lg w-full p-6 text-stone-200 shadow-2xl relative text-center">
         <Sparkles className="w-12 h-12 text-[#ffd782] mx-auto mb-2 animate-bounce" />

@@ -123,7 +123,7 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
   return (
     <div
       id="action-challenge-modal"
-      className="fixed inset-0 bg-stone-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 z-50 animate-fadeIn"
+      className="fixed inset-0 bg-stone-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 z-[60] animate-fadeIn"
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0, y: 15 }}

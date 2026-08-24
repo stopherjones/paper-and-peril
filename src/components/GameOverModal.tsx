@@ -65,7 +65,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   return (
     <div
       id="game-over-modal-overlay"
-      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
     >
       <div
         className={`border-4 rounded-xl max-w-xl w-full p-6 text-stone-200 shadow-2xl relative text-center ${

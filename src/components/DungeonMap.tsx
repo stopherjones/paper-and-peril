@@ -22,6 +22,7 @@ import {
   Crown,
   ChevronRight,
   Info,
+  Maximize2,
 } from 'lucide-react';
 import { DungeonFloor, DungeonRoom, GameItem, HeroCharacter, RoomType } from '../types/game';
 import { sounds } from '../utils/audio';
@@ -31,30 +32,47 @@ interface DungeonMapProps {
   floor: DungeonFloor;
   currentRoomId: string;
   hero: HeroCharacter;
-  onPeekRoom: (targetRoomId: string) => void;
   onSelectAdjacentRoom: (targetRoomId: string) => void;
   onSmashWall: (wallId: string, item: GameItem) => void;
   onPhaseThroughWall: (targetRoomId: string, item?: GameItem) => void;
-  onUseTorch: () => void;
+  onUseTorch: (targetRoomId: string) => void;
   onUseClairvoyance: (targetRoomId: string) => void;
+  onOpenCurrentRoom?: () => void;
 }
 
 export const DungeonMap: React.FC<DungeonMapProps> = ({
   floor,
   currentRoomId,
   hero,
-  onPeekRoom,
   onSelectAdjacentRoom,
   onSmashWall,
   onPhaseThroughWall,
   onUseTorch,
   onUseClairvoyance,
+  onOpenCurrentRoom,
 }) => {
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [isClairvoyanceMode, setIsClairvoyanceMode] = useState(false);
+  const [isTorchTargetMode, setIsTorchTargetMode] = useState(false);
+  const [showChamberMix, setShowChamberMix] = useState(false);
 
   const currentRoom = floor.rooms[currentRoomId] || floor.rooms[floor.startRoomId];
   const allRooms: DungeonRoom[] = Object.values(floor.rooms);
+
+  // Calculate chamber mix stats for this floor
+  const totalRooms = allRooms.length;
+  const revealedCount = allRooms.filter((r) => r.isRevealed).length;
+  const exploredCount = allRooms.filter((r) => r.isExplored).length;
+  const hiddenCount = totalRooms - revealedCount;
+
+  const monsters = allRooms.filter((r) => r.type === 'MONSTER' && !r.isBossRoom);
+  const bossRoom = allRooms.find((r) => r.isBossRoom);
+  const treasures = allRooms.filter((r) => r.type === 'TREASURE');
+  const traps = allRooms.filter((r) => r.type === 'TRAP');
+  const shrines = allRooms.filter((r) => r.type === 'SHRINE');
+  const campfires = allRooms.filter((r) => r.type === 'CAMPFIRE');
+  const merchants = allRooms.filter((r) => r.type === 'MERCHANT');
+  const secrets = allRooms.filter((r) => r.type === 'SECRET');
 
   // Check inventory for special wall tools
   const hasBreachingTool = hero.inventory.find(
@@ -135,9 +153,33 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
       return;
     }
 
-    // If clicked current room, select/inspect it
+    if (isTorchTargetMode) {
+      const isAdjacent = areCoordinatesAdjacent(
+        { x: currentRoom.gridX, y: currentRoom.gridY },
+        { x: targetRoom.gridX, y: targetRoom.gridY }
+      );
+      if (isAdjacent && !targetRoom.isRevealed) {
+        sounds.playDiceRoll();
+        onUseTorch(targetRoom.id);
+        setIsTorchTargetMode(false);
+        setSelectedCellId(targetRoom.id);
+      } else if (targetRoom.isRevealed) {
+        // Already revealed
+        setSelectedCellId(targetRoom.id);
+        setIsTorchTargetMode(false);
+      } else {
+        // Not adjacent
+        sounds.playBlock();
+      }
+      return;
+    }
+
+    // If clicked current room, select/inspect it and trigger opening current room modal (except CAMPFIRE)
     if (targetRoom.id === currentRoomId) {
       setSelectedCellId(targetRoom.id);
+      if (onOpenCurrentRoom && targetRoom.type !== 'CAMPFIRE') {
+        onOpenCurrentRoom();
+      }
       return;
     }
 
@@ -207,10 +249,21 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
             <Compass className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5 font-serif text-xs font-bold text-[#e5b967] tracking-wider uppercase">
+            <div className="flex items-center gap-2 font-serif text-xs font-bold text-[#e5b967] tracking-wider uppercase">
               <span>Floor {floor.floorNumber} — 4x4 Floor Grid</span>
+              <button
+                id="btn-floor-chamber-mix-info"
+                onClick={() => setShowChamberMix(!showChamberMix)}
+                className="px-1.5 py-0.5 rounded bg-[#382515] hover:bg-[#52371f] text-amber-300 border border-[#6b4724] transition-colors flex items-center gap-1 cursor-pointer font-sans normal-case text-[10px]"
+                title="View Room Mix Breakdown for Floor"
+              >
+                <Info className="w-3 h-3 text-amber-400" />
+                <span>Chamber Mix</span>
+              </button>
             </div>
-            <span className="text-[10px] text-stone-400 font-mono">16 Room Tiles & Maze Walls</span>
+            <span className="text-[10px] text-stone-400 font-mono">
+              16 Room Tiles ({revealedCount} revealed, {hiddenCount} hidden)
+            </span>
           </div>
         </div>
 
@@ -220,14 +273,22 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
             <button
               id="btn-use-torch-map"
               onClick={() => {
-                sounds.playDiceRoll();
-                onUseTorch();
+                if (selectedRoom && isSelectedAdjacent && !selectedRoom.isRevealed) {
+                  sounds.playDiceRoll();
+                  onUseTorch(selectedRoom.id);
+                } else {
+                  setIsTorchTargetMode(!isTorchTargetMode);
+                }
               }}
-              className="px-2 py-1 bg-[#442d17] hover:bg-[#5a3c1f] text-orange-200 border border-[#855427] rounded text-[11px] font-serif flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
-              title="Light a torch to peek and reveal all 4 adjacent room tiles"
+              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-colors cursor-pointer shadow-sm border ${
+                isTorchTargetMode
+                  ? 'bg-orange-950 border-orange-500 text-orange-200 animate-pulse'
+                  : 'bg-[#442d17] hover:bg-[#5a3c1f] text-orange-200 border-[#855427]'
+              }`}
+              title="Click an adjacent unrevealed room to light and reveal it (Uses 1 Torch)"
             >
               <Flame className="w-3.5 h-3.5 text-orange-400" />
-              <span>Torch ({hero.torches})</span>
+              <span>{isTorchTargetMode ? 'Select Room' : `Torch (${hero.torches})`}</span>
             </button>
           )}
 
@@ -249,6 +310,111 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
         </div>
       </div>
 
+      {/* Chamber Mix Info Overlay Modal */}
+      {showChamberMix && (
+        <div className="mb-3 p-3.5 bg-[#19110a] border-2 border-amber-600/70 rounded-lg text-stone-200 shadow-xl animate-fade-in">
+          <div className="flex items-center justify-between border-b border-[#4d3622] pb-2 mb-2.5">
+            <div className="flex items-center gap-1.5">
+              <Info className="w-4 h-4 text-amber-400" />
+              <h3 className="font-serif font-bold text-xs text-amber-200 uppercase tracking-wider">
+                Floor {floor.floorNumber} Chamber Distribution & Deck Mix
+              </h3>
+            </div>
+            <button
+              id="btn-close-chamber-mix"
+              onClick={() => setShowChamberMix(false)}
+              className="text-[10px] font-mono text-stone-400 hover:text-stone-100 px-1.5 py-0.5 bg-[#2a1a10] rounded border border-[#523821]"
+            >
+              ✕ Close
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-serif">
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-red-300 font-bold mb-1">
+                <Skull className="w-3.5 h-3.5 text-red-400" />
+                <span>Monsters ({monsters.length})</span>
+              </div>
+              <p className="text-[10px] text-stone-400">
+                {monsters.filter((m) => m.isCleared).length} Cleared •{' '}
+                {monsters.filter((m) => m.isRevealed && !m.isCleared).length} Active
+              </p>
+            </div>
+
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>Boss & Stairs (1)</span>
+              </div>
+              <p className="text-[10px] text-stone-400">
+                {bossRoom?.isRevealed ? (bossRoom.isCleared ? 'Defeated' : 'Located') : 'Hidden'}
+              </p>
+            </div>
+
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-yellow-300 font-bold mb-1">
+                <Package className="w-3.5 h-3.5 text-yellow-400" />
+                <span>Vaults ({treasures.length})</span>
+              </div>
+              <p className="text-[10px] text-stone-400">
+                {treasures.filter((t) => t.isCleared).length} Looted •{' '}
+                {treasures.filter((t) => !t.isCleared).length} Unopened
+              </p>
+            </div>
+
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-orange-300 font-bold mb-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
+                <span>Traps ({traps.length})</span>
+              </div>
+              <p className="text-[10px] text-stone-400">
+                {traps.filter((t) => t.trap?.disarmed || t.trap?.triggered).length} Neutralized
+              </p>
+            </div>
+
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-cyan-300 font-bold mb-1">
+                <Sun className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Shrines ({shrines.length})</span>
+              </div>
+              <p className="text-[10px] text-stone-400">Stat Blessings & Boons</p>
+            </div>
+
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
+                <Tent className="w-3.5 h-3.5 text-amber-500" />
+                <span>Campfire ({campfires.length})</span>
+              </div>
+              <p className="text-[10px] text-stone-400">Safe Hearth & Rest</p>
+            </div>
+
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-emerald-300 font-bold mb-1">
+                <Store className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Shop ({merchants.length})</span>
+              </div>
+              <p className="text-[10px] text-stone-400">Merchant Goods</p>
+            </div>
+
+            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+              <div className="flex items-center gap-1.5 text-purple-300 font-bold mb-1">
+                <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
+                <span>Secrets ({secrets.length})</span>
+              </div>
+              <p className="text-[10px] text-stone-400">Hidden Relic Chamber</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Torch Mode Banner Notification */}
+      {isTorchTargetMode && (
+        <div className="mb-2.5 p-2 bg-orange-950/90 border border-orange-500 rounded text-center text-xs font-serif text-orange-200 animate-pulse flex items-center justify-center gap-1.5">
+          <Flame className="w-4 h-4 text-orange-400" />
+          <span>Torch Lit: Click any adjacent unrevealed room to reveal it! (Uses 1 Torch)</span>
+        </div>
+      )}
+
       {/* Clairvoyance Banner Notification */}
       {isClairvoyanceMode && (
         <div className="mb-2.5 p-1.5 bg-purple-950/80 border border-purple-500 rounded text-center text-xs font-serif text-purple-200 animate-pulse flex items-center justify-center gap-1.5">
@@ -257,15 +423,42 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
         </div>
       )}
 
+      {/* Active Chamber Location Bar & Open Pop-up Button */}
+      {currentRoom && (
+        <div className="mb-2.5 p-2 bg-[#1b120a] border border-[#523820] rounded-lg flex items-center justify-between gap-2 shadow-sm">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+            <div className="text-xs font-serif truncate">
+              <span className="text-stone-400">Current Chamber: </span>
+              <strong className="text-amber-200 font-bold">{currentRoom.title}</strong>{' '}
+              <span className="text-stone-500 font-mono text-[10px]">
+                [{currentRoom.gridX + 1},{currentRoom.gridY + 1}]
+              </span>
+            </div>
+          </div>
+
+          <button
+            id="btn-quick-open-chamber"
+            onClick={() => {
+              if (onOpenCurrentRoom) onOpenCurrentRoom();
+            }}
+            className="px-2.5 py-1 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-serif font-black text-xs rounded-md shadow flex items-center gap-1 shrink-0 cursor-pointer active:scale-95 transition-all"
+            title="Open full-screen pop-up for current chamber"
+          >
+            <span>Enter Chamber ➔</span>
+          </button>
+        </div>
+      )}
+
       {/* 4x4 Burgle Bros Board with Interactive Tiles & Walls */}
-      <div className="bg-[#170f09] p-3 rounded-lg border-2 border-[#422c19] relative overflow-hidden bg-[radial-gradient(#382414_1px,transparent_1px)] [background-size:14px_14px]">
-        {/* Grid Container */}
-        <div className="flex flex-col gap-1.5 sm:gap-2 mx-auto max-w-full overflow-x-auto py-1">
+      <div className="bg-[#170f09] p-3 rounded-lg border-2 border-[#422c19] relative overflow-hidden bg-[radial-gradient(#382414_1px,transparent_1px)] [background-size:14px_14px] flex justify-center">
+        {/* Grid Container - Tightly Clustered and Centered */}
+        <div className="inline-flex flex-col gap-1 sm:gap-1.5 mx-auto max-w-full overflow-x-auto py-1">
           {gridMatrix.map((row, rIdx) => (
-            <div key={`row-${rIdx}`} className="flex flex-col gap-1.5 sm:gap-2 min-w-[240px] sm:min-w-[270px]">
+            <div key={`row-${rIdx}`} className="flex flex-col gap-1 sm:gap-1.5">
               {/* Horizontal Wall Row Above (between rIdx-1 and rIdx) */}
               {rIdx > 0 && (
-                <div className="flex items-center justify-between px-1.5 sm:px-2 h-1.5 relative">
+                <div className="flex items-center justify-center gap-1 sm:gap-1.5 h-1.5 relative">
                   {row.map((cell, cIdx) => {
                     const aboveCell = gridMatrix[rIdx - 1][cIdx];
                     const hWall =
@@ -277,35 +470,37 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                         : null;
 
                     return (
-                      <div
-                        key={`hwall-${rIdx}-${cIdx}`}
-                        className="w-14 sm:w-16 md:w-18 flex items-center justify-center"
-                      >
-                        {hWall ? (
-                          hWall.isBroken ? (
-                            <div
-                              className="w-full h-1 bg-amber-800/40 border-t border-b border-dashed border-amber-500/60 rounded"
-                              title="Broken Wall (Passable Archway)"
-                            />
+                      <React.Fragment key={`hwall-${rIdx}-${cIdx}`}>
+                        <div
+                          className="w-14 sm:w-16 flex items-center justify-center shrink-0"
+                        >
+                          {hWall ? (
+                            hWall.isBroken ? (
+                              <div
+                                className="w-full h-1 bg-amber-800/40 border-t border-b border-dashed border-amber-500/60 rounded"
+                                title="Broken Wall (Passable Archway)"
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-2 bg-gradient-to-r from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-y border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413]"
+                                title="Solid Stone Wall (Blocks Movement)"
+                              />
+                            )
                           ) : (
-                            <div
-                              className="w-full h-2 bg-gradient-to-r from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-y border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413]"
-                              title="Solid Stone Wall (Blocks Movement)"
-                            />
-                          )
-                        ) : (
-                          <div className="w-full h-1 border-t border-stone-800/40" />
-                        )}
-                      </div>
+                            <div className="w-full h-1 border-t border-stone-800/40" />
+                          )}
+                        </div>
+                        {cIdx < 3 && <div className="w-2 shrink-0" />}
+                      </React.Fragment>
                     );
                   })}
                 </div>
               )}
 
               {/* Room Cards Row with Vertical Walls Between */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5">
                 {row.map((room, cIdx) => {
-                  if (!room) return <div key={cIdx} className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 opacity-0" />;
+                  if (!room) return <div key={cIdx} className="w-14 h-14 sm:w-16 sm:h-16 opacity-0 shrink-0" />;
 
                   const isCurrent = room.id === currentRoomId;
                   const isRevealed = room.isRevealed;
@@ -343,7 +538,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                       <button
                         id={`map-card-tile-${room.id}`}
                         onClick={() => handleTileClick(room)}
-                        className={`w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 rounded-lg border-2 text-xs font-serif flex flex-col items-center justify-between p-1 relative transition-all duration-200 cursor-pointer shadow-md shrink-0 ${
+                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-lg border-2 text-xs font-serif flex flex-col items-center justify-between p-1 relative transition-all duration-200 cursor-pointer shadow-md shrink-0 ${
                           isCurrent
                             ? 'bg-[#523315] border-[#fae498] ring-2 ring-amber-400 text-amber-100 shadow-amber-950/80 scale-105 z-20'
                             : isSelected
@@ -416,21 +611,21 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
 
                       {/* Vertical Wall Between Columns */}
                       {cIdx < 3 && (
-                        <div className="w-2 flex items-center justify-center relative">
+                        <div className="w-2 flex items-center justify-center relative shrink-0">
                           {vWall ? (
                             vWall.isBroken ? (
                               <div
-                                className="w-1.5 h-12 bg-amber-800/40 border-l border-r border-dashed border-amber-500/60 rounded"
+                                className="w-1.5 h-10 sm:h-12 bg-amber-800/40 border-l border-r border-dashed border-amber-500/60 rounded"
                                 title="Broken Wall (Passable Archway)"
                               />
                             ) : (
                               <div
-                                className="w-2 h-14 bg-gradient-to-b from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-x border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413]"
+                                className="w-2 h-12 sm:h-14 bg-gradient-to-b from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-x border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413]"
                                 title="Solid Stone Wall (Blocks Movement)"
                               />
                             )
                           ) : (
-                            <div className="w-0.5 h-12 border-l border-stone-800/40" />
+                            <div className="w-0.5 h-10 sm:h-12 border-l border-stone-800/40" />
                           )}
                         </div>
                       )}
@@ -468,19 +663,41 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
 
           {/* Action Buttons for Selected Tile */}
           <div className="flex flex-wrap gap-2">
-            {/* If unrevealed & adjacent -> Peek Option */}
-            {!selectedRoom.isRevealed && isSelectedAdjacent && (
+            {/* If Selected Room is Current Room -> Enter/Inspect Chamber Pop-up (except Dungeon Hearth) */}
+            {selectedRoom.id === currentRoomId && selectedRoom.type !== 'CAMPFIRE' && (
               <button
-                id="btn-peek-selected-room"
+                id="btn-inspect-selected-current-room"
                 onClick={() => {
-                  sounds.playDiceRoll();
-                  onPeekRoom(selectedRoom.id);
+                  if (onOpenCurrentRoom) onOpenCurrentRoom();
                 }}
-                className="px-3 py-1.5 bg-[#3b2615] hover:bg-[#52351e] text-amber-200 border border-[#78512b] rounded text-xs font-serif font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                className="px-3 py-1.5 bg-gradient-to-b from-[#8f6333] to-[#5a3b1c] hover:from-[#a6753d] hover:to-[#6d4722] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
               >
-                <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Peek & Turn Over Card</span>
+                <Maximize2 className="w-3.5 h-3.5 text-amber-300" />
+                <span>Enter & Inspect Chamber (Open Pop-Up) ➔</span>
               </button>
+            )}
+
+            {/* If unrevealed & adjacent -> Torch Reveal Option */}
+            {!selectedRoom.isRevealed && isSelectedAdjacent && (
+              hero.torches > 0 ? (
+                <button
+                  id="btn-torch-selected-room"
+                  onClick={() => {
+                    sounds.playDiceRoll();
+                    onUseTorch(selectedRoom.id);
+                  }}
+                  className="px-3 py-1.5 bg-[#472a14] hover:bg-[#5e381b] text-orange-200 border border-[#915828] rounded text-xs font-serif font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                  title="Use 1 Torch to reveal this adjacent room without entering"
+                >
+                  <Flame className="w-3.5 h-3.5 text-orange-400" />
+                  <span>Light Torch to Reveal ({hero.torches} left)</span>
+                </button>
+              ) : (
+                <div className="text-[11px] font-serif text-stone-400 bg-[#140e09] px-2.5 py-1.5 rounded border border-[#3d2716] flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 text-stone-600" />
+                  <span>Hidden Face-Down (Torch required to scout without entering)</span>
+                </div>
+              )
             )}
 
             {/* If adjacent & NO unbroken wall -> Enter Room */}

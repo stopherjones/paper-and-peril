@@ -103,7 +103,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   return (
     <div
       id="inventory-modal-overlay"
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in"
     >
       <div className="bg-[#241a12] border-4 border-[#8c6b45] rounded-xl max-w-3xl w-full p-4 md:p-6 text-stone-200 shadow-2xl relative max-h-[90vh] flex flex-col">
         {/* Header */}
@@ -165,6 +165,30 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* Active Modifiers & Spells in Equipment / Pack */}
+            <div className="pt-2 border-t border-[#442e1d] mt-3">
+              <div className="flex items-center gap-1.5 text-cyan-300 font-serif font-bold text-xs mb-1.5">
+                <Wand2 className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Spellbook & Active Enchantments</span>
+              </div>
+              <div className="space-y-1">
+                {hero.skills.map((skill) => (
+                  <div
+                    key={skill.id}
+                    className="p-1.5 bg-[#161220] border border-[#3b2d54] rounded text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-cyan-200 font-serif">{skill.name}</span>
+                      <span className="text-[9px] font-mono text-cyan-300 bg-cyan-950 px-1 py-0.2 rounded border border-cyan-800">
+                        {skill.manaCost} MP
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-stone-400 font-serif">{skill.description}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

@@ -89,7 +89,7 @@ export const LootRollerModal: React.FC<LootRollerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#18120c] border-2 border-amber-600/80 rounded-xl max-w-2xl w-full p-6 shadow-2xl text-amber-100 animate-fadeIn relative">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-amber-900/60 pb-3 mb-4">

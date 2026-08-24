@@ -164,24 +164,87 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
         })}
       </div>
 
-      {/* Active Equipment Summary */}
+      {/* Active Buffs / Spell Modifiers (Visible for as long as they last) */}
+      {hero.activeEffects && hero.activeEffects.length > 0 && (
+        <div className="mb-2.5 p-2 bg-[#1b1526] border border-purple-500/70 rounded-lg animate-pulse shadow-md">
+          <div className="flex items-center gap-1.5 text-purple-300 font-serif font-bold text-[11px] mb-1">
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>Active Magical Modifiers & Buffs ({hero.activeEffects.length})</span>
+          </div>
+          <div className="space-y-1">
+            {hero.activeEffects.map((effect) => (
+              <div
+                key={effect.id}
+                className="bg-[#120c1c] p-1.5 rounded border border-purple-900/60 flex items-center justify-between text-[10px]"
+              >
+                <div>
+                  <span className="font-bold text-purple-200">{effect.name}: </span>
+                  <span className="text-stone-300 font-serif">{effect.description}</span>
+                </div>
+                <span className="px-1.5 py-0.5 rounded bg-purple-950 border border-purple-700 text-purple-300 font-mono font-bold shrink-0">
+                  {effect.durationTurns} turns
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Available Spells & Grimoire in Pack / Equipment */}
       <div className="border-t border-[#44301d] pt-2 mb-2.5">
-        <span className="text-[10px] font-mono text-stone-400 uppercase tracking-wider block mb-1.5">
-          Equipped Gear:
-        </span>
-        <div className="grid grid-cols-2 gap-1.5 text-xs">
-          <div className="bg-[#1a120b] p-1.5 rounded border border-[#3b2818] flex items-center gap-1.5 truncate">
-            <Sword className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span className="truncate text-[11px] font-serif text-stone-300">
-              {hero.equipment.weapon?.name || 'Bare Fists'}
-            </span>
-          </div>
-          <div className="bg-[#1a120b] p-1.5 rounded border border-[#3b2818] flex items-center gap-1.5 truncate">
-            <Shield className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="truncate text-[11px] font-serif text-stone-300">
-              {hero.equipment.armor?.name || hero.equipment.offhand?.name || 'Simple Cloth'}
-            </span>
-          </div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider flex items-center gap-1">
+            <Wand2 className="w-3 h-3 text-cyan-400" /> Available Spells & Abilities:
+          </span>
+          <span className="text-[10px] font-mono text-cyan-300 font-bold">
+            {hero.currentMana} / {hero.maxMana} MP
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          {hero.skills.map((skill) => (
+            <div
+              key={skill.id}
+              className="bg-[#14121a] p-1.5 rounded border border-[#3b3252] flex items-center justify-between text-xs"
+            >
+              <div className="truncate mr-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-serif font-bold text-cyan-200 text-[11px] truncate">
+                    {skill.name}
+                  </span>
+                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 shrink-0">
+                    {skill.manaCost} MP
+                  </span>
+                </div>
+                <div className="text-[10px] text-stone-400 font-serif truncate">
+                  {skill.diceFormula ? `${skill.diceFormula} • ` : ''}
+                  {skill.description}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Spell Scrolls in Adventurer's Pack */}
+          {hero.inventory
+            .filter((inv) => inv.item.type === 'scroll')
+            .map((inv, idx) => (
+              <div
+                key={`scroll-${idx}`}
+                className="bg-[#18111e] p-1.5 rounded border border-purple-900/60 flex items-center justify-between text-xs"
+              >
+                <div className="truncate">
+                  <div className="flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
+                    <span className="font-serif font-bold text-purple-200 text-[11px] truncate">
+                      {inv.item.name} {inv.quantity > 1 ? `(x${inv.quantity})` : ''}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-stone-400 font-serif truncate">
+                    {inv.item.description}
+                  </div>
+                </div>
+              </div>
+            ))}
         </div>
       </div>
 

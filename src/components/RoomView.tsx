@@ -17,17 +17,12 @@ import {
   Shield,
   Dices,
   Flame,
-  ArrowUp,
-  ArrowRight,
-  ArrowDown,
-  ArrowLeft,
   Sparkles,
   Heart,
   Wand2,
   Crown,
   Eye,
   Hammer,
-  ShieldAlert,
 } from 'lucide-react';
 import { DungeonFloor, DungeonRoom, GameItem, HeroCharacter, StatType } from '../types/game';
 import { DiceVisualizer } from './DiceVisualizer';
@@ -35,7 +30,6 @@ import { LootRollerModal } from './LootRollerModal';
 import { ActionChallengeModal, ActionChallengeConfig } from './ActionChallengeModal';
 import { rollDice, getStatModifier, RollResult } from '../utils/dice';
 import { sounds } from '../utils/audio';
-import { hasWallBetween } from '../utils/generator';
 
 interface RoomViewProps {
   floor: DungeonFloor;
@@ -46,10 +40,11 @@ interface RoomViewProps {
   onEnterCombat: (room: DungeonRoom) => void;
   onOpenMerchant: () => void;
   onNavigateToRoom: (targetRoomId: string) => void;
-  onPeekRoom: (targetRoomId: string) => void;
+  onUseTorch?: (targetRoomId: string) => void;
   onSmashWall: (wallId: string, item: GameItem) => void;
   onPhaseThroughWall: (targetRoomId: string, item?: GameItem) => void;
   onDescendFloor: () => void;
+  onClose?: () => void;
 }
 
 export const RoomView: React.FC<RoomViewProps> = ({
@@ -61,10 +56,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
   onEnterCombat,
   onOpenMerchant,
   onNavigateToRoom,
-  onPeekRoom,
+  onUseTorch,
   onSmashWall,
   onPhaseThroughWall,
   onDescendFloor,
+  onClose,
 }) => {
   const [currentRoll, setCurrentRoll] = useState<RollResult | null>(null);
   const [isRolling, setIsRolling] = useState(false);
@@ -353,14 +349,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
     setShowChallengeModal(true);
   };
 
-  // Cardinal directions on the 4x4 grid
-  const directions = [
-    { dir: 'north', dx: 0, dy: -1, label: 'North', icon: <ArrowUp className="w-4 h-4" /> },
-    { dir: 'east', dx: 1, dy: 0, label: 'East', icon: <ArrowRight className="w-4 h-4" /> },
-    { dir: 'south', dx: 0, dy: 1, label: 'South', icon: <ArrowDown className="w-4 h-4" /> },
-    { dir: 'west', dx: -1, dy: 0, label: 'West', icon: <ArrowLeft className="w-4 h-4" /> },
-  ] as const;
-
   return (
     <div id="room-view-container" className="max-w-4xl mx-auto space-y-4">
       {/* Room Narrative & Atmosphere Card */}
@@ -389,10 +377,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
         )}
       </div>
 
-      {/* Main Room Interaction Area */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-        {/* Left Column: Interactive Encounter Content */}
-        <div className="md:col-span-7 flex flex-col gap-3">
+      {/* Main Room Interactive Encounter Area */}
+      <div className="flex flex-col gap-4">
           {/* 1. Monster / Boss Encounter */}
           {room.monster && room.monster.hp > 0 && (
             <div
@@ -752,164 +738,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
             </div>
           )}
         </div>
-
-        {/* Right Column: Burgle Bros Cardinal Passages & Walls */}
-        <div className="md:col-span-5 flex flex-col gap-3">
-          <div className="bg-[#1f1710] border-2 border-[#6d5135] rounded-xl p-3.5 shadow-lg">
-            <div className="flex items-center justify-between border-b border-[#4d3622] pb-2 mb-2.5">
-              <h3 className="text-xs font-serif font-bold text-[#e6c898] uppercase tracking-wider">
-                Corridor Exits (4x4 Grid)
-              </h3>
-              <span className="text-[10px] text-stone-400 font-mono">
-                Tile [{room.gridX + 1},{room.gridY + 1}]
-              </span>
-            </div>
-
-            {room.monster && room.monster.hp > 0 ? (
-              <div className="text-xs text-red-400 font-serif bg-[#24130f] p-3 rounded-lg border border-red-900/60 leading-relaxed">
-                <p className="font-bold mb-1 flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
-                  <span>A hostile beast blocks your path!</span>
-                </p>
-                <span>You cannot move freely between chambers while a monster confronts you. Engage in combat to clear the passage.</span>
-              </div>
-            ) : room.trap && !room.trap.disarmed && !room.trap.triggered ? (
-              <div className="text-xs text-yellow-400 font-serif bg-[#241a12] p-3 rounded-lg border border-yellow-800/70 leading-relaxed">
-                <p className="font-bold mb-1 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0" />
-                  <span>Active Trap Hazard!</span>
-                </p>
-                <span>The chamber is rigged with a hazardous trap mechanism. You must attempt to deactivate it (using Dexterity, Intelligence, Strength, or Luck) before exiting through any corridor.</span>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {directions.map((d) => {
-                  const nx = room.gridX + d.dx;
-                  const ny = room.gridY + d.dy;
-
-                  // Out of bounds
-                  if (nx < 0 || nx >= 4 || ny < 0 || ny >= 4) {
-                    return (
-                      <div
-                        key={d.dir}
-                        className="p-2 bg-[#140d08] border border-stone-900 rounded-md text-[11px] font-serif text-stone-600 flex items-center gap-2 opacity-50"
-                      >
-                        <span className="p-1 bg-[#0c0704] text-stone-700 rounded">{d.icon}</span>
-                        <span>{d.label}: Solid Dungeon Perimeter Wall</span>
-                      </div>
-                    );
-                  }
-
-                  const neighborId = `floor_${floor.floorNumber}_r${nx}_${ny}`;
-                  const neighbor = floor.rooms[neighborId];
-
-                  // Check if there is an unbroken wall between room and neighbor
-                  const wall = (floor.walls || []).find(
-                    (w) =>
-                      (w.roomA.x === room.gridX &&
-                        w.roomA.y === room.gridY &&
-                        w.roomB.x === nx &&
-                        w.roomB.y === ny) ||
-                      (w.roomA.x === nx &&
-                        w.roomA.y === ny &&
-                        w.roomB.x === room.gridX &&
-                        w.roomB.y === room.gridY)
-                  );
-
-                  const isWallBlocked = wall && !wall.isBroken;
-
-                  if (isWallBlocked) {
-                    return (
-                      <div
-                        key={d.dir}
-                        className="p-2.5 bg-[#261612] border border-red-900/70 rounded-md text-xs font-serif flex flex-col gap-1.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-stone-300 font-bold">
-                            <span className="p-1 bg-[#1a0e0b] text-red-400 rounded">{d.icon}</span>
-                            <span>{d.label} [{nx + 1},{ny + 1}]: Solid Wall</span>
-                          </div>
-                          <span className="text-[10px] text-red-400 font-mono">Blocked</span>
-                        </div>
-
-                        {/* Wall options */}
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {hasBreachingTool && (
-                            <button
-                              id={`btn-smash-wall-${d.dir}`}
-                              onClick={() => onSmashWall(wall.id, hasBreachingTool.item)}
-                              className="px-2 py-1 bg-[#5c241c] hover:bg-[#732d23] text-amber-200 border border-red-500 rounded text-[11px] font-serif font-bold flex items-center gap-1 cursor-pointer"
-                            >
-                              <Hammer className="w-3 h-3 text-amber-300" />
-                              <span>Smash Wall</span>
-                            </button>
-                          )}
-
-                          {(isWearingEtherealRing || hasPhasingPotion) && (
-                            <button
-                              id={`btn-phase-wall-${d.dir}`}
-                              onClick={() => onPhaseThroughWall(neighborId, hasPhasingPotion?.item)}
-                              className="px-2 py-1 bg-[#432357] hover:bg-[#582e73] text-purple-200 border border-purple-400 rounded text-[11px] font-serif font-bold flex items-center gap-1 cursor-pointer"
-                            >
-                              <Sparkles className="w-3 h-3 text-purple-300" />
-                              <span>Phase Through</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Open Passage / Doorway
-                  return (
-                    <div
-                      key={d.dir}
-                      className="p-2 bg-[#2a1e14] hover:bg-[#3d2c1d] border border-[#5c4028] rounded-md text-xs font-serif flex items-center justify-between transition-colors shadow-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="p-1 bg-[#17100a] text-amber-400 rounded">{d.icon}</span>
-                        <div>
-                          <div className="font-bold text-amber-200">
-                            {d.label} Archway [{nx + 1},{ny + 1}]
-                          </div>
-                          <span className="text-[10px] text-stone-400 font-mono">
-                            {neighbor?.isRevealed ? neighbor.title : 'Unrevealed Tile (?)'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {!neighbor?.isRevealed && (
-                          <button
-                            id={`btn-peek-door-${d.dir}`}
-                            onClick={() => onPeekRoom(neighborId)}
-                            className="p-1 bg-[#19110a] hover:bg-[#2e1e12] border border-[#6b4724] rounded text-cyan-300 text-[10px] flex items-center gap-1 cursor-pointer"
-                            title="Peek to turn over this card"
-                          >
-                            <Eye className="w-3 h-3" />
-                            <span>Peek</span>
-                          </button>
-                        )}
-
-                        <button
-                          id={`btn-enter-door-${d.dir}`}
-                          onClick={() => onNavigateToRoom(neighborId)}
-                          className="px-2.5 py-1 bg-gradient-to-b from-[#7a5526] to-[#4d3415] hover:from-[#94682f] hover:to-[#63431c] text-amber-100 border border-amber-600 rounded text-xs font-bold cursor-pointer"
-                        >
-                          Enter →
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Mini Dice Tray for Room Checks */}
-          <DiceVisualizer currentRoll={currentRoll} isRolling={isRolling} label="Skill Check Tray" />
-        </div>
-      </div>
 
       {/* Loot Roller Modal */}
       <LootRollerModal

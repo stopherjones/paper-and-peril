@@ -17,7 +17,7 @@ export const HallOfFameModal: React.FC<HallOfFameModalProps> = ({ onClose }) => 
   return (
     <div
       id="hall-of-fame-modal-overlay"
-      className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
     >
       <div className="bg-[#241a12] border-4 border-[#8c6b45] rounded-xl max-w-2xl w-full p-4 md:p-6 text-stone-200 shadow-2xl relative max-h-[85vh] flex flex-col">
         {/* Header */}

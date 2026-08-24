@@ -15,6 +15,8 @@ import {
   Flame,
   Package,
   Dices,
+  Heart,
+  Tent,
 } from 'lucide-react';
 import {
   CombatState,
@@ -29,8 +31,7 @@ import {
 import { CharacterCreation } from './components/CharacterCreation';
 import { CharacterSheet } from './components/CharacterSheet';
 import { DungeonMap } from './components/DungeonMap';
-import { RoomView } from './components/RoomView';
-import { CombatView } from './components/CombatView';
+import { RoomModal } from './components/RoomModal';
 import { MerchantModal } from './components/MerchantModal';
 import { InventoryModal } from './components/InventoryModal';
 import { LevelUpModal } from './components/LevelUpModal';
@@ -65,9 +66,10 @@ export default function App() {
   });
 
   // Modal Dialog UI state
+  const [showRoomModal, setShowRoomModal] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showMerchant, setShowMerchant] = useState(false);
-  const [showRulebook, setShowRulebook] = useState(false);
+  const [showRulebook, setShowRulebook] = useState(true);
   const [showHallOfFame, setShowHallOfFame] = useState(false);
   const [showJournal, setShowJournal] = useState(false);
   const [showTableInspector, setShowTableInspector] = useState(false);
@@ -128,6 +130,7 @@ export default function App() {
       soundEnabled: gameState.soundEnabled,
     });
     setPreviousRoomId(startRoomId);
+    setShowRoomModal(true);
   };
 
   // Toggle Sound FX
@@ -137,61 +140,27 @@ export default function App() {
     setGameState((prev) => ({ ...prev, soundEnabled: next }));
   };
 
-  // Peek a single room card without moving into it
-  const handlePeekRoom = (targetRoomId: string) => {
-    const floorObj = gameState.floors[gameState.currentFloor];
-    if (!floorObj || !floorObj.rooms[targetRoomId]) return;
-
-    const targetRoom = floorObj.rooms[targetRoomId];
-    targetRoom.isRevealed = true;
-
-    setGameState((prev) => ({
-      ...prev,
-      floors: {
-        ...prev.floors,
-        [prev.currentFloor]: {
-          ...floorObj,
-          rooms: {
-            ...floorObj.rooms,
-            [targetRoomId]: targetRoom,
-          },
-        },
-      },
-    }));
-  };
-
-  // Light Torch to peek and reveal all 4 adjacent rooms
-  const handleUseTorch = () => {
+  // Light Torch to reveal a single chosen adjacent room without entering it
+  const handleUseTorch = (targetRoomId: string) => {
     if (!gameState.hero || gameState.hero.torches <= 0) return;
     const currentFloorObj = gameState.floors[gameState.currentFloor];
-    const currentRoom = currentFloorObj?.rooms[gameState.currentRoomId];
-    if (!currentRoom) return;
+    if (!currentFloorObj || !currentFloorObj.rooms[targetRoomId]) return;
 
+    const targetRoom = { ...currentFloorObj.rooms[targetRoomId], isRevealed: true };
     const hero = { ...gameState.hero, torches: gameState.hero.torches - 1 };
-
-    // Reveal 4 cardinal neighbors
-    const deltas = [
-      { dx: 0, dy: -1 },
-      { dx: 1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: -1, dy: 0 },
-    ];
-
-    deltas.forEach((d) => {
-      const nx = currentRoom.gridX + d.dx;
-      const ny = currentRoom.gridY + d.dy;
-      const nId = `floor_${gameState.currentFloor}_r${nx}_${ny}`;
-      if (currentFloorObj.rooms[nId]) {
-        currentFloorObj.rooms[nId].isRevealed = true;
-      }
-    });
 
     setGameState((prev) => ({
       ...prev,
       hero,
       floors: {
         ...prev.floors,
-        [prev.currentFloor]: { ...currentFloorObj },
+        [prev.currentFloor]: {
+          ...currentFloorObj,
+          rooms: {
+            ...currentFloorObj.rooms,
+            [targetRoomId]: targetRoom,
+          },
+        },
       },
     }));
   };
@@ -329,6 +298,12 @@ export default function App() {
     }
 
     setPreviousRoomId(gameState.currentRoomId);
+    if (targetRoom.type !== 'CAMPFIRE') {
+      setShowRoomModal(true);
+    } else {
+      setShowRoomModal(false);
+    }
+
     setGameState((prev) => ({
       ...prev,
       hero: updatedHero,
@@ -347,10 +322,69 @@ export default function App() {
     }));
   };
 
+  // Dungeon Hearth Resting Actions directly on Main View
+  const handleCampfireRest = () => {
+    if (!gameState.hero || !currentRoom) return;
+    sounds.playHeal();
+    const heroStats = { ...gameState.hero.stats };
+    (Object.values(gameState.hero.equipment) as (GameItem | undefined)[]).forEach((item) => {
+      if (!item?.statBonuses) return;
+      if (item.statBonuses.CON) heroStats.CON += item.statBonuses.CON;
+      if (item.statBonuses.INT) heroStats.INT += item.statBonuses.INT;
+    });
+
+    const hpGain = 12 + getStatModifier(heroStats.CON) * 2;
+    const manaGain = 10 + getStatModifier(heroStats.INT) * 2;
+
+    const updatedHero = {
+      ...gameState.hero,
+      currentHp: Math.min(gameState.hero.maxHp, gameState.hero.currentHp + hpGain),
+      currentMana: Math.min(gameState.hero.maxMana, gameState.hero.currentMana + manaGain),
+    };
+
+    const updatedRoom = { ...currentRoom, isCleared: true };
+    const floorObj = gameState.floors[gameState.currentFloor];
+
+    setGameState((prev) => ({
+      ...prev,
+      hero: updatedHero,
+      floors: {
+        ...prev.floors,
+        [prev.currentFloor]: {
+          ...floorObj,
+          rooms: {
+            ...floorObj.rooms,
+            [currentRoom.id]: updatedRoom,
+          },
+        },
+      },
+      historyLog: [
+        `Rested by the Dungeon Hearth. Restored ${hpGain} HP & ${manaGain} Mana.`,
+        ...prev.historyLog,
+      ],
+    }));
+  };
+
+  const handleEatRation = () => {
+    if (!gameState.hero || gameState.hero.rations <= 0) return;
+    sounds.playHeal();
+    const updatedHero = {
+      ...gameState.hero,
+      rations: gameState.hero.rations - 1,
+      currentHp: Math.min(gameState.hero.maxHp, gameState.hero.currentHp + 10),
+    };
+    setGameState((prev) => ({
+      ...prev,
+      hero: updatedHero,
+      historyLog: [`Ate salted dungeon rations. Restored 10 HP.`, ...prev.historyLog],
+    }));
+  };
+
   // Initiate Combat
   const handleEnterCombat = (room: DungeonRoom) => {
     if (!room.monster) return;
     sounds.playDiceRoll();
+    setShowRoomModal(true);
 
     const heroInitiative = rollDice(1, 20, getStatModifier(gameState.hero.stats.DEX));
     const monsterInitiative = rollDice(1, 20, getStatModifier(room.monster.dexterity ?? 10));
@@ -480,6 +514,7 @@ export default function App() {
       phase: 'EXPLORATION',
     }));
     setPreviousRoomId(nextFloorObj.startRoomId);
+    setShowRoomModal(true);
   };
 
   // Confirm Level Up
@@ -616,76 +651,77 @@ export default function App() {
         )}
 
         {gameState.phase !== 'CHARACTER_CREATION' && gameState.hero && currentFloorObj && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            {/* Left Sidebar (Desktop): Character Sheet & 4x4 Floor Map */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-6xl mx-auto">
+            {/* Left Column: Character Sheet */}
             <div className="lg:col-span-5 flex flex-col gap-4">
               <CharacterSheet
                 hero={gameState.hero}
                 onOpenInventory={() => setShowInventory(true)}
                 onOpenJournal={() => setShowJournal(true)}
               />
+            </div>
 
+            {/* Right Column: 4x4 Floor Map & Active Chamber Hub */}
+            <div className="lg:col-span-7 flex flex-col gap-4">
               <DungeonMap
                 floor={currentFloorObj}
                 currentRoomId={gameState.currentRoomId}
                 hero={gameState.hero}
-                onPeekRoom={handlePeekRoom}
                 onSelectAdjacentRoom={handleNavigateToRoom}
                 onSmashWall={handleSmashWall}
                 onPhaseThroughWall={handlePhaseThroughWall}
                 onUseTorch={handleUseTorch}
                 onUseClairvoyance={handleUseClairvoyance}
+                onOpenCurrentRoom={() => setShowRoomModal(true)}
               />
-            </div>
 
-            {/* Right Main Stage: Room Exploration or Combat */}
-            <div className="lg:col-span-7">
-              {gameState.phase === 'EXPLORATION' && currentRoom && (
-                <RoomView
-                  floor={currentFloorObj}
-                  room={currentRoom}
-                  hero={gameState.hero}
-                  onUpdateHero={(updatedHero) =>
-                    setGameState((prev) => ({ ...prev, hero: updatedHero }))
-                  }
-                  onUpdateRoom={(updatedRoom) => {
-                    setGameState((prev) => ({
-                      ...prev,
-                      floors: {
-                        ...prev.floors,
-                        [prev.currentFloor]: {
-                          ...currentFloorObj,
-                          rooms: {
-                            ...currentFloorObj.rooms,
-                            [updatedRoom.id]: updatedRoom,
-                          },
-                        },
-                      },
-                    }));
-                  }}
-                  onEnterCombat={handleEnterCombat}
-                  onOpenMerchant={() => setShowMerchant(true)}
-                  onNavigateToRoom={handleNavigateToRoom}
-                  onPeekRoom={handlePeekRoom}
-                  onSmashWall={handleSmashWall}
-                  onPhaseThroughWall={handlePhaseThroughWall}
-                  onDescendFloor={handleDescendFloor}
-                />
-              )}
+              {/* Current Chamber Quick Action Card on Main Overview */}
+              {currentRoom && (
+                <div className="bg-[#241a12] border-2 border-[#735438] rounded-xl p-4 text-stone-200 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs bg-[#19110a] text-amber-300 px-2 py-0.5 rounded border border-[#4d341f]">
+                        Chamber [{currentRoom.gridX + 1},{currentRoom.gridY + 1}]
+                      </span>
+                      <h3 className="font-serif font-bold text-base text-[#f5e4c6]">{currentRoom.title}</h3>
+                    </div>
+                    <p className="text-xs text-stone-300 font-serif line-clamp-2">
+                      {currentRoom.description}
+                    </p>
+                  </div>
 
-              {gameState.phase === 'COMBAT' && gameState.combat && (
-                <CombatView
-                  hero={gameState.hero}
-                  combat={gameState.combat}
-                  onUpdateHero={(updatedHero) =>
-                    setGameState((prev) => ({ ...prev, hero: updatedHero }))
-                  }
-                  onUpdateCombat={(updatedCombat) =>
-                    setGameState((prev) => ({ ...prev, combat: updatedCombat }))
-                  }
-                  onCombatVictory={handleCombatVictory}
-                  onCombatFlee={handleCombatFlee}
-                />
+                  {currentRoom.type === 'CAMPFIRE' ? (
+                    <div className="grid grid-cols-2 gap-2 shrink-0">
+                      <button
+                        id="btn-main-rest-campfire"
+                        onClick={handleCampfireRest}
+                        className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
+                        title="Rest by hearth to restore HP and Mana"
+                      >
+                        <Heart className="w-4 h-4 text-red-400" />
+                        <span>Rest & Bandage</span>
+                      </button>
+                      <button
+                        id="btn-main-eat-ration"
+                        disabled={gameState.hero.rations <= 0}
+                        onClick={handleEatRation}
+                        className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
+                        title={`Eat provisions to restore 10 HP (${gameState.hero.rations} rations remaining)`}
+                      >
+                        <Flame className="w-4 h-4 text-orange-400" />
+                        <span>Eat Rations ({gameState.hero.rations})</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      id="btn-main-open-chamber-modal"
+                      onClick={() => setShowRoomModal(true)}
+                      className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-serif font-black text-xs rounded-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 transition-all"
+                    >
+                      <span>Enter Chamber Pop-Up ➔</span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -693,6 +729,47 @@ export default function App() {
       </main>
 
       {/* Modals & Overlays */}
+      {/* Full-Screen Room Exploration & Combat Pop-Up Modal */}
+      {currentFloorObj && currentRoom && gameState.hero && (
+        <RoomModal
+          isOpen={showRoomModal || gameState.phase === 'COMBAT'}
+          onClose={() => setShowRoomModal(false)}
+          floor={currentFloorObj}
+          room={currentRoom}
+          hero={gameState.hero}
+          combat={gameState.combat}
+          onUpdateHero={(updatedHero) =>
+            setGameState((prev) => ({ ...prev, hero: updatedHero }))
+          }
+          onUpdateRoom={(updatedRoom) => {
+            setGameState((prev) => ({
+              ...prev,
+              floors: {
+                ...prev.floors,
+                [prev.currentFloor]: {
+                  ...currentFloorObj,
+                  rooms: {
+                    ...currentFloorObj.rooms,
+                    [updatedRoom.id]: updatedRoom,
+                  },
+                },
+              },
+            }));
+          }}
+          onEnterCombat={handleEnterCombat}
+          onUpdateCombat={(updatedCombat) =>
+            setGameState((prev) => ({ ...prev, combat: updatedCombat }))
+          }
+          onCombatVictory={handleCombatVictory}
+          onCombatFlee={handleCombatFlee}
+          onOpenMerchant={() => setShowMerchant(true)}
+          onNavigateToRoom={handleNavigateToRoom}
+          onUseTorch={handleUseTorch}
+          onSmashWall={handleSmashWall}
+          onPhaseThroughWall={handlePhaseThroughWall}
+          onDescendFloor={handleDescendFloor}
+        />
+      )}
       {showInventory && gameState.hero && (
         <InventoryModal
           hero={gameState.hero}
