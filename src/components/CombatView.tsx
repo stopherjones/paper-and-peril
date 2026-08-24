@@ -305,7 +305,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
     setCurrentRoll(spellRoll);
 
     setTimeout(() => {
-      const isHit = spellRoll.isCrit || spellRoll.total >= monster.armorClass - 1;
+      const isHit = spellRoll.isCrit || (!spellRoll.isFumble && spellRoll.total >= monster.armorClass);
       setPendingAttack({
         type: 'spell',
         name: skill.name,

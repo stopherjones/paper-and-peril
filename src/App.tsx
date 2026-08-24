@@ -17,6 +17,9 @@ import {
   Dices,
   Heart,
   Tent,
+  CheckCircle2,
+  ArrowDownCircle,
+  Store,
 } from 'lucide-react';
 import {
   CombatState,
@@ -40,7 +43,7 @@ import { RulebookModal } from './components/RulebookModal';
 import { HallOfFameModal } from './components/HallOfFameModal';
 import { JournalModal } from './components/JournalModal';
 import { TableInspectorModal } from './components/TableInspectorModal';
-import { generateDungeonFloor } from './utils/generator';
+import { generateDungeonFloor, isRoomPassedThrough, getRoomDisplayInfo } from './utils/generator';
 import { saveGameState, loadGameState, clearGameState } from './utils/storage';
 import { sounds } from './utils/audio';
 import { rollDice, getStatModifier } from './utils/dice';
@@ -298,7 +301,8 @@ export default function App() {
     }
 
     setPreviousRoomId(gameState.currentRoomId);
-    if (targetRoom.type !== 'CAMPFIRE') {
+    const isTargetPassed = isRoomPassedThrough(targetRoom);
+    if (!isTargetPassed && targetRoom.type !== 'CAMPFIRE') {
       setShowRoomModal(true);
     } else {
       setShowRoomModal(false);
@@ -673,56 +677,85 @@ export default function App() {
                 onUseTorch={handleUseTorch}
                 onUseClairvoyance={handleUseClairvoyance}
                 onOpenCurrentRoom={() => setShowRoomModal(true)}
+                onDescendFloor={handleDescendFloor}
               />
 
               {/* Current Chamber Quick Action Card on Main Overview */}
-              {currentRoom && (
-                <div className="bg-[#241a12] border-2 border-[#735438] rounded-xl p-4 text-stone-200 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-xs bg-[#19110a] text-amber-300 px-2 py-0.5 rounded border border-[#4d341f]">
-                        Chamber [{currentRoom.gridX + 1},{currentRoom.gridY + 1}]
-                      </span>
-                      <h3 className="font-serif font-bold text-base text-[#f5e4c6]">{currentRoom.title}</h3>
-                    </div>
-                    <p className="text-xs text-stone-300 font-serif line-clamp-2">
-                      {currentRoom.description}
-                    </p>
-                  </div>
+              {currentRoom && (() => {
+                const currentInfo = getRoomDisplayInfo(currentRoom);
+                const isCurrentPassed = isRoomPassedThrough(currentRoom);
 
-                  {currentRoom.type === 'CAMPFIRE' ? (
-                    <div className="grid grid-cols-2 gap-2 shrink-0">
-                      <button
-                        id="btn-main-rest-campfire"
-                        onClick={handleCampfireRest}
-                        className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
-                        title="Rest by hearth to restore HP and Mana"
-                      >
-                        <Heart className="w-4 h-4 text-red-400" />
-                        <span>Rest & Bandage</span>
-                      </button>
-                      <button
-                        id="btn-main-eat-ration"
-                        disabled={gameState.hero.rations <= 0}
-                        onClick={handleEatRation}
-                        className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
-                        title={`Eat provisions to restore 10 HP (${gameState.hero.rations} rations remaining)`}
-                      >
-                        <Flame className="w-4 h-4 text-orange-400" />
-                        <span>Eat Rations ({gameState.hero.rations})</span>
-                      </button>
+                return (
+                  <div className="bg-[#241a12] border-2 border-[#735438] rounded-xl p-4 text-stone-200 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-xs bg-[#19110a] text-amber-300 px-2 py-0.5 rounded border border-[#4d341f]">
+                          Chamber [{currentRoom.gridX + 1},{currentRoom.gridY + 1}]
+                        </span>
+                        <h3 className="font-serif font-bold text-base text-[#f5e4c6]">{currentInfo.title}</h3>
+                      </div>
+                      <p className="text-xs text-stone-300 font-serif line-clamp-2">
+                        {currentInfo.description}
+                      </p>
                     </div>
-                  ) : (
-                    <button
-                      id="btn-main-open-chamber-modal"
-                      onClick={() => setShowRoomModal(true)}
-                      className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-serif font-black text-xs rounded-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 transition-all"
-                    >
-                      <span>Enter Chamber Pop-Up ➔</span>
-                    </button>
-                  )}
-                </div>
-              )}
+
+                    {currentRoom.type === 'CAMPFIRE' ? (
+                      <div className="grid grid-cols-2 gap-2 shrink-0">
+                        <button
+                          id="btn-main-rest-campfire"
+                          onClick={handleCampfireRest}
+                          className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
+                          title="Rest by hearth to restore HP and Mana"
+                        >
+                          <Heart className="w-4 h-4 text-red-400" />
+                          <span>Rest & Bandage</span>
+                        </button>
+                        <button
+                          id="btn-main-eat-ration"
+                          disabled={gameState.hero.rations <= 0}
+                          onClick={handleEatRation}
+                          className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
+                          title={`Eat provisions to restore 10 HP (${gameState.hero.rations} rations remaining)`}
+                        >
+                          <Flame className="w-4 h-4 text-orange-400" />
+                          <span>Eat Rations ({gameState.hero.rations})</span>
+                        </button>
+                      </div>
+                    ) : currentRoom.isBossRoom && currentRoom.isStairsUnlocked ? (
+                      <button
+                        id="btn-main-descend-stairs"
+                        onClick={handleDescendFloor}
+                        className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-serif font-black text-xs rounded-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 transition-all"
+                      >
+                        <ArrowDownCircle className="w-4 h-4 text-stone-950" />
+                        <span>Descend Stairs to Floor {gameState.currentFloor + 1} ➔</span>
+                      </button>
+                    ) : currentRoom.type === 'MERCHANT' ? (
+                      <button
+                        id="btn-main-trade-merchant"
+                        onClick={() => setShowRoomModal(true)}
+                        className="px-4 py-2.5 bg-gradient-to-r from-emerald-700 to-emerald-800 hover:from-emerald-600 hover:to-emerald-700 text-emerald-100 font-serif font-bold text-xs rounded-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 transition-all"
+                      >
+                        <Store className="w-4 h-4 text-emerald-300" />
+                        <span>Trade with Merchant ➔</span>
+                      </button>
+                    ) : isCurrentPassed ? (
+                      <div className="flex items-center gap-2 bg-[#172417] text-emerald-300 border border-emerald-700/60 px-3.5 py-2 rounded-lg text-xs font-serif font-bold shrink-0 shadow">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>Chamber Cleared & Secure</span>
+                      </div>
+                    ) : (
+                      <button
+                        id="btn-main-open-chamber-modal"
+                        onClick={() => setShowRoomModal(true)}
+                        className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-serif font-black text-xs rounded-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 transition-all"
+                      >
+                        <span>Enter Chamber Pop-Up ➔</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

@@ -247,6 +247,189 @@ type PrescriptiveRoomCard =
   | { kind: 'LOW_MONSTER' }
   | { kind: 'MID_MONSTER' };
 
+// 2. Boss candidate positions (1-indexed: 4,1  4,2  4,3  4,4  3,3  3,4  2,4  1,4)
+// Converted to 0-indexed (x = col - 1, y = row - 1)
+export const BOSS_CANDIDATE_POSITIONS: { x: number; y: number }[] = [
+  { x: 3, y: 0 }, // 4,1 (Col 4, Row 1)
+  { x: 3, y: 1 }, // 4,2 (Col 4, Row 2)
+  { x: 3, y: 2 }, // 4,3 (Col 4, Row 3)
+  { x: 3, y: 3 }, // 4,4 (Col 4, Row 4)
+  { x: 2, y: 2 }, // 3,3 (Col 3, Row 3)
+  { x: 2, y: 3 }, // 3,4 (Col 3, Row 4)
+  { x: 1, y: 3 }, // 2,4 (Col 2, Row 4)
+  { x: 0, y: 3 }, // 1,4 (Col 1, Row 4)
+];
+
+export function isBossCandidatePosition(x: number, y: number): boolean {
+  return BOSS_CANDIDATE_POSITIONS.some((p) => p.x === x && p.y === y);
+}
+
+/**
+ * Checks if a dungeon chamber has been successfully resolved, cleared, or bypassed.
+ */
+export function isRoomPassedThrough(room?: DungeonRoom | null): boolean {
+  if (!room) return false;
+  if (room.type === 'CAMPFIRE') return true;
+  if (room.isCleared) return true;
+  if (room.type === 'MONSTER' || room.type === 'BOSS_ROOM') {
+    return !room.monster || room.monster.hp <= 0;
+  }
+  if (room.type === 'TRAP') {
+    return !!(room.trap?.disarmed || room.trap?.triggered);
+  }
+  if (room.type === 'TREASURE') {
+    return !!room.chest?.isOpened;
+  }
+  if (room.type === 'SHRINE') {
+    return !!room.shrine?.used;
+  }
+  if (room.type === 'SECRET') {
+    return !!(room.secret?.discovered || room.secret?.rewardClaimed);
+  }
+  if (room.type === 'STAIRS') {
+    return !!room.isStairsUnlocked;
+  }
+  return false;
+}
+
+/**
+ * Returns dynamic title, description, and status tag for rooms based on whether they have been cleared.
+ */
+export function getRoomDisplayInfo(room: DungeonRoom): {
+  title: string;
+  description: string;
+  statusBadge?: string;
+  isPassed: boolean;
+} {
+  const isPassed = isRoomPassedThrough(room);
+
+  if (room.type === 'CAMPFIRE') {
+    return {
+      title: room.title || 'Dungeon Hearth',
+      description: 'The warm embers crackle peacefully. A safe haven to rest, bandage wounds, and eat rations.',
+      statusBadge: 'Safe Haven',
+      isPassed: true,
+    };
+  }
+
+  if (room.type === 'MONSTER') {
+    if (isPassed) {
+      return {
+        title: `${room.title} — Foe Defeated`,
+        description: `The slain remains of the ${room.monster?.name || 'creature'} lie motionless in the dust. The chamber is quiet and safe to traverse.`,
+        statusBadge: 'Foe Defeated',
+        isPassed: true,
+      };
+    }
+    return {
+      title: room.title,
+      description: room.description,
+      statusBadge: 'Hostile Monster',
+      isPassed: false,
+    };
+  }
+
+  if (room.type === 'BOSS_ROOM') {
+    if (isPassed) {
+      return {
+        title: `${room.title} — Guardian Defeated (Stairs Open)`,
+        description: 'The ancient floor guardian has been vanquished! The descent archway is unlocked and ready for descent.',
+        statusBadge: 'Stairs Unlocked',
+        isPassed: true,
+      };
+    }
+    return {
+      title: room.title,
+      description: room.description,
+      statusBadge: 'Floor Boss & Descent Gate',
+      isPassed: false,
+    };
+  }
+
+  if (room.type === 'TRAP') {
+    if (room.trap?.disarmed) {
+      return {
+        title: `${room.title} — Trap Disarmed`,
+        description: 'The mechanical triggers, tripwires, and pressure plates have been dismantled. The passage is secure.',
+        statusBadge: 'Trap Disarmed',
+        isPassed: true,
+      };
+    }
+    if (room.trap?.triggered || isPassed) {
+      return {
+        title: `${room.title} — Trap Expended`,
+        description: 'The spent trap mechanism lies broken and harmless against the flagstones. Safe to cross.',
+        statusBadge: 'Trap Expended',
+        isPassed: true,
+      };
+    }
+    return {
+      title: room.title,
+      description: room.description,
+      statusBadge: 'Active Trap Hazard',
+      isPassed: false,
+    };
+  }
+
+  if (room.type === 'TREASURE') {
+    if (isPassed) {
+      return {
+        title: `${room.title} — Vault Claimed`,
+        description: 'The reinforced iron chest stands wide open and empty. All gold and relics have been collected.',
+        statusBadge: 'Vault Looted',
+        isPassed: true,
+      };
+    }
+    return {
+      title: room.title,
+      description: room.description,
+      statusBadge: 'Locked Treasure Vault',
+      isPassed: false,
+    };
+  }
+
+  if (room.type === 'SHRINE') {
+    if (isPassed) {
+      return {
+        title: `${room.title} — Blessing Claimed`,
+        description: 'The divine glow of the deity altar has subsided peacefully after granting its boon.',
+        statusBadge: 'Altar Dormant',
+        isPassed: true,
+      };
+    }
+    return {
+      title: room.title,
+      description: room.description,
+      statusBadge: 'Sacred Altar',
+      isPassed: false,
+    };
+  }
+
+  if (room.type === 'SECRET') {
+    if (isPassed) {
+      return {
+        title: `${room.title} — Secret Explored`,
+        description: 'The hidden masonry compartment has been fully inspected and its cache collected.',
+        statusBadge: 'Secret Looted',
+        isPassed: true,
+      };
+    }
+    return {
+      title: room.title,
+      description: room.description,
+      statusBadge: 'Hidden Cache Room',
+      isPassed: false,
+    };
+  }
+
+  return {
+    title: room.title,
+    description: room.description,
+    statusBadge: isPassed ? 'Cleared' : undefined,
+    isPassed,
+  };
+}
+
 /**
  * Procedurally generates a 4x4 Burgle Bros-style dungeon floor grid (16 tiles) with walls & boss chamber
  * Prescriptive Composition:
@@ -269,21 +452,8 @@ export function generateDungeonFloor(floorNumber: number): DungeonFloor {
   // 1. Entrance position: always (0, 0) in 0-indexed [1, 1 in 1-based]
   const startPos = { x: 0, y: 0 };
 
-  // 2. Boss candidate positions (1-indexed: 4,1  4,2  4,3  4,4  3,3  3,4  2,4  1,4)
-  // Converted to 0-indexed (x = col - 1, y = row - 1)
-  const bossCandidates: { x: number; y: number }[] = [
-    { x: 3, y: 0 }, // 4,1
-    { x: 3, y: 1 }, // 4,2
-    { x: 3, y: 2 }, // 4,3
-    { x: 3, y: 3 }, // 4,4
-    { x: 2, y: 2 }, // 3,3
-    { x: 2, y: 3 }, // 3,4
-    { x: 1, y: 3 }, // 2,4
-    { x: 0, y: 3 }, // 1,4
-  ];
-
-  // Pick one boss candidate at random
-  const bossPos = bossCandidates[Math.floor(Math.random() * bossCandidates.length)];
+  // 2. Pick one boss candidate at random from candidate spots
+  const bossPos = BOSS_CANDIDATE_POSITIONS[Math.floor(Math.random() * BOSS_CANDIDATE_POSITIONS.length)];
 
   // 3. Collect the remaining 14 positions (excluding startPos and bossPos)
   const allPositions: { x: number; y: number }[] = [];
