@@ -130,7 +130,7 @@ export default function App() {
       soundEnabled: gameState.soundEnabled,
     });
     setPreviousRoomId(startRoomId);
-    setShowRoomModal(true);
+    setShowRoomModal(false);
   };
 
   // Toggle Sound FX
@@ -514,7 +514,7 @@ export default function App() {
       phase: 'EXPLORATION',
     }));
     setPreviousRoomId(nextFloorObj.startRoomId);
-    setShowRoomModal(true);
+    setShowRoomModal(false);
   };
 
   // Confirm Level Up

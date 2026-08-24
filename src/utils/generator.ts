@@ -240,6 +240,9 @@ export function hasWallBetween(walls: DungeonFloor['walls'] | undefined, a: { x:
 
 type PrescriptiveRoomCard =
   | { kind: 'TREASURE' }
+  | { kind: 'MERCHANT' }
+  | { kind: 'SHRINE' }
+  | { kind: 'SECRET' }
   | { kind: 'TRAP' }
   | { kind: 'LOW_MONSTER' }
   | { kind: 'MID_MONSTER' };
@@ -247,13 +250,15 @@ type PrescriptiveRoomCard =
 /**
  * Procedurally generates a 4x4 Burgle Bros-style dungeon floor grid (16 tiles) with walls & boss chamber
  * Prescriptive Composition:
- * - 1 Entrance at (0,0) [1,1]
- * - 1 Boss / Stair room placed randomly in: (4,1), (4,2), (4,3), (4,4), (3,3), (3,4), (2,4), or (1,4)
- * - 4 Loot rooms (Treasure vault chests)
+ * - 1 Entrance (Dungeon Hearth) at (0,0) [1,1]
+ * - 1 Boss / Stair room placed randomly in candidates
+ * - 7 Monsters (4 Low-Strength / Grinding monsters + 3 Mid-Strength monsters)
  * - 3 Traps (Requiring Skill/DEX/INT/STR/LCK checks to deactivate)
- * - 4 Low-Strength / Grinding monsters (Boost XP, no loot)
- * - 3 Mid-Strength monsters (Impactful threat, yields loot drops & gold)
- * Total: 1 + 1 + 4 + 3 + 4 + 3 = 16 tiles!
+ * - 1 Vault (Treasure chest)
+ * - 1 Shop (Merchant outpost)
+ * - 1 Shrine (Divine blessing altar)
+ * - 1 Secrets room (Hidden wall compartment)
+ * Total: 1 + 1 + 7 + 3 + 1 + 1 + 1 + 1 = 16 tiles!
  */
 export function generateDungeonFloor(floorNumber: number): DungeonFloor {
   const meta = FLOOR_METADATA.find((m) => m.floorNumber === floorNumber) || FLOOR_METADATA[0];
@@ -299,15 +304,18 @@ export function generateDungeonFloor(floorNumber: number): DungeonFloor {
   }
 
   // 4. Build the exact 14 prescriptive room cards deck:
-  // - 4 Loot rooms
+  // - 1 Vault (Treasure chest)
+  // - 1 Shop (Merchant)
+  // - 1 Shrine (Divine blessing altar)
+  // - 1 Secret room (Hidden wall compartment)
   // - 3 Traps
   // - 4 Low-strength grinding monsters (boosts XP, no loot)
   // - 3 Mid-strength monsters (impactful threat + loot)
   const roomDeck: PrescriptiveRoomCard[] = [
     { kind: 'TREASURE' },
-    { kind: 'TREASURE' },
-    { kind: 'TREASURE' },
-    { kind: 'TREASURE' },
+    { kind: 'MERCHANT' },
+    { kind: 'SHRINE' },
+    { kind: 'SECRET' },
     { kind: 'TRAP' },
     { kind: 'TRAP' },
     { kind: 'TRAP' },
@@ -448,6 +456,8 @@ export function generateDungeonFloor(floorNumber: number): DungeonFloor {
     let monster: Monster | undefined;
     let chest: DungeonRoom['chest'];
     let trap: DungeonRoom['trap'];
+    let shrine: DungeonRoom['shrine'];
+    let secret: DungeonRoom['secret'];
 
     if (isStart) {
       type = 'CAMPFIRE';
@@ -483,6 +493,35 @@ export function generateDungeonFloor(floorNumber: number): DungeonFloor {
           isOpened: false,
           gold: loot.gold,
           items: loot.items,
+        };
+      } else if (card.kind === 'MERCHANT') {
+        type = 'MERCHANT';
+        title = "Olaf's Wandering Trading Post";
+        description = 'A colorful wooden pack cart illuminated by brass lanterns sits peacefully in the alcove.';
+        flavorText = '“Greetings, adventurer! Trade your gathered gold for potions, keys, weapons, and iron rations.”';
+      } else if (card.kind === 'SHRINE') {
+        type = 'SHRINE';
+        const shrineDef = SHRINE_EVENTS[(floorNumber - 1) % SHRINE_EVENTS.length] || SHRINE_EVENTS[0];
+        title = shrineDef.name;
+        description = shrineDef.description;
+        flavorText = `A divine altar dedicated to ${shrineDef.godName}. Offering a prayer restores health and mana.`;
+        shrine = {
+          id: shrineDef.id,
+          name: shrineDef.name,
+          description: shrineDef.description,
+          god: shrineDef.godName,
+          used: false,
+        };
+      } else if (card.kind === 'SECRET') {
+        type = 'SECRET';
+        title = 'Chamber of Whispering Runes';
+        description = 'Ancient stone masonry with unusual seams and hollow-sounding flagstones.';
+        flavorText = 'Searching the masonry (INT/LCK test) might reveal a hidden cache of ancient gold and relics.';
+        secret = {
+          discovered: false,
+          difficulty: 10 + floorNumber * 2,
+          rewardDescription: 'Hidden Cache of Ancient Relics',
+          rewardClaimed: false,
         };
       } else if (card.kind === 'TRAP') {
         type = 'TRAP';
@@ -564,6 +603,8 @@ export function generateDungeonFloor(floorNumber: number): DungeonFloor {
       monster,
       chest,
       trap,
+      shrine,
+      secret,
     };
   }
 
