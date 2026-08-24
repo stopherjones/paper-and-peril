@@ -1,0 +1,6 @@
+{
+  "name": "Dungeon Dice Crawler",
+  "description": "Old school paper and dice solo dungeon crawler with character rolling, weighted procedural room generation, combat, loot, merchant trading, and a final dragon boss.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

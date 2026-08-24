@@ -1,0 +1,950 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { HeroClassId, RoomType } from '../types/game';
+
+export interface TableRow<T = any> {
+  minRoll: number;
+  maxRoll: number;
+  id: string;
+  name: string;
+  subtitle?: string;
+  description: string;
+  icon: string;
+  badge?: string;
+  data: T;
+}
+
+export interface RollableTable<T = any> {
+  id: string;
+  title: string;
+  diceFormula: string; // e.g. "1d6", "1d20", "1d100"
+  diceSides: number;
+  diceCount: number;
+  description: string;
+  rows: TableRow<T>[];
+}
+
+// ==========================================
+// 1. CHARACTER CLASS / ARCHETYPE TABLE (1d6)
+// ==========================================
+export const CHARACTER_CLASS_TABLE: RollableTable<HeroClassId> = {
+  id: 'character_class_table',
+  title: 'Character Archetype Table',
+  diceFormula: '1d6',
+  diceSides: 6,
+  diceCount: 1,
+  description: 'Roll a six-sided die to determine your adventuring class and destiny.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 1,
+      id: 'warrior',
+      name: 'Warrior',
+      subtitle: 'Master of Steel & Shield',
+      description: 'Heavily armored juggernaut specializing in raw physical strength, cleaving strikes, and resilient defense.',
+      icon: 'Shield',
+      badge: 'Primary: STR',
+      data: 'warrior',
+    },
+    {
+      minRoll: 2,
+      maxRoll: 2,
+      id: 'rogue',
+      name: 'Rogue',
+      subtitle: 'Shadowblade & Locksmith',
+      description: 'Cunning scoundrel who excels in lockpicking, disarming mechanical traps, and landing deadly critical strikes.',
+      icon: 'Zap',
+      badge: 'Primary: DEX',
+      data: 'rogue',
+    },
+    {
+      minRoll: 3,
+      maxRoll: 3,
+      id: 'wizard',
+      name: 'Wizard',
+      subtitle: 'Arcane Evoker & Mystic',
+      description: 'Master of elemental mysteries who casts destructive fireballs and arcane shields with high intelligence.',
+      icon: 'Sparkles',
+      badge: 'Primary: INT',
+      data: 'wizard',
+    },
+    {
+      minRoll: 4,
+      maxRoll: 4,
+      id: 'cleric',
+      name: 'Cleric',
+      subtitle: 'Holy Vessel of the Dawn',
+      description: 'Devout priest wielding radiant divine power to heal mortal wounds, smite undead, and protect the weary.',
+      icon: 'Sun',
+      badge: 'Primary: CON / INT',
+      data: 'cleric',
+    },
+    {
+      minRoll: 5,
+      maxRoll: 5,
+      id: 'paladin',
+      name: 'Paladin',
+      subtitle: 'Oathbound Holy Crusader',
+      description: 'Righteous knight in polished plate mail channeling divine wrath through devastating smites.',
+      icon: 'ShieldAlert',
+      badge: 'Primary: STR / CON',
+      data: 'paladin',
+    },
+    {
+      minRoll: 6,
+      maxRoll: 6,
+      id: 'ranger',
+      name: 'Ranger',
+      subtitle: 'Wildstrider & Marksman',
+      description: 'Keen-eyed tracker lethal with hunting bows, survival crafts, and setting lethal snare traps.',
+      icon: 'Target',
+      badge: 'Primary: DEX / STR',
+      data: 'ranger',
+    },
+  ],
+};
+
+// ==========================================
+// 2. STARTING BOONS / HEIRLOOMS TABLE (1d6)
+// ==========================================
+export interface StartingBoon {
+  type: 'gold' | 'item' | 'lockpicks' | 'supplies' | 'tokens' | 'ac';
+  value: number;
+  itemId?: string;
+  grantText: string;
+}
+
+export const STARTING_BOON_TABLE: RollableTable<StartingBoon> = {
+  id: 'starting_boon_table',
+  title: 'Starting Heirloom & Boon Table',
+  diceFormula: '1d6',
+  diceSides: 6,
+  diceCount: 1,
+  description: 'Roll a six-sided die to inherit a family heirloom or special expedition boon.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 1,
+      id: 'ancestral_purse',
+      name: 'Ancestral Coin Pouch',
+      subtitle: '+25 Bonus Starting Gold',
+      description: 'A heavy velvet purse passed down from your mercenary grandfather.',
+      icon: 'Coins',
+      badge: '+25 Gold',
+      data: { type: 'gold', value: 25, grantText: '+25 Starting Gold added to purse' },
+    },
+    {
+      minRoll: 2,
+      maxRoll: 2,
+      id: 'healing_draught',
+      name: 'Elixir of True Vigor',
+      subtitle: 'Greater Healing Potion',
+      description: 'A glowing red glass phial brewed by the temple apothecaries.',
+      icon: 'Heart',
+      badge: 'Greater Potion',
+      data: { type: 'item', value: 1, itemId: 'greater_healing_potion', grantText: '1x Greater Healing Potion added to inventory' },
+    },
+    {
+      minRoll: 3,
+      maxRoll: 3,
+      id: 'masterwork_picks',
+      name: 'Masterwork Lockpicks',
+      subtitle: '+3 Bonus Lockpicks',
+      description: 'Tempered steel tension wrenches and notched picks that rarely break.',
+      icon: 'Key',
+      badge: '+3 Lockpicks',
+      data: { type: 'lockpicks', value: 3, grantText: '+3 Masterwork Lockpicks' },
+    },
+    {
+      minRoll: 4,
+      maxRoll: 4,
+      id: 'silver_talisman',
+      name: 'Silver Warding Amulet',
+      subtitle: 'Blessed Ward (+1 AC)',
+      description: 'A gleaming talisman engraved with protective runes that deflect blades.',
+      icon: 'Shield',
+      badge: '+1 Armor Class',
+      data: { type: 'item', value: 1, itemId: 'warding_talisman', grantText: 'Warding Talisman added to equipment' },
+    },
+    {
+      minRoll: 5,
+      maxRoll: 5,
+      id: 'expedition_pack',
+      name: "Trailblazer's Rucksack",
+      subtitle: '+3 Rations & +2 Torches',
+      description: 'Smoked meats, dried berries, and seasoned pitch-soaked torches.',
+      icon: 'Package',
+      badge: 'Supplies Pack',
+      data: { type: 'supplies', value: 3, grantText: '+3 Extra Rations & +2 Torches' },
+    },
+    {
+      minRoll: 6,
+      maxRoll: 6,
+      id: 'fate_charm',
+      name: 'Amulet of the Fates',
+      subtitle: '+2 Fate Reroll Tokens',
+      description: 'An iridescent coin engraved with the dual faces of Fortune and Destiny.',
+      icon: 'Dices',
+      badge: '+2 Fate Tokens',
+      data: { type: 'tokens', value: 2, grantText: '+2 Fate Die Reroll Tokens' },
+    },
+  ],
+};
+
+// ==========================================
+// 3. CHAMBER GENERATION TABLES (1d20)
+// ==========================================
+export const ROOM_TABLE_FLOOR_1: RollableTable<RoomType> = {
+  id: 'room_table_floor_1',
+  title: 'Catacombs Chamber Table (Floor 1)',
+  diceFormula: '1d20',
+  diceSides: 20,
+  diceCount: 1,
+  description: 'Roll 1d20 upon opening an unexplored stone portal to generate the chamber.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 8,
+      id: 'monster_f1',
+      name: 'Hostile Crypt Lair',
+      subtitle: 'Monster Encounter (Roll 1d6)',
+      description: 'Dark shadows stir in the corners as predatory denizens leap to attack.',
+      icon: 'Skull',
+      badge: 'Danger',
+      data: 'MONSTER',
+    },
+    {
+      minRoll: 9,
+      maxRoll: 12,
+      id: 'treasure_f1',
+      name: 'Iron Vault Alcove',
+      subtitle: 'Treasure Chest & Relics',
+      description: 'A reinforced iron-banded chest sits unlooted amidst ancient cobwebs.',
+      icon: 'Package',
+      badge: 'Reward',
+      data: 'TREASURE',
+    },
+    {
+      minRoll: 13,
+      maxRoll: 14,
+      id: 'trap_f1',
+      name: 'Trapped Corridor',
+      subtitle: 'Pressure Plate & Poison Darts',
+      description: 'Suspicious floor stones and notched wall holes threaten unwary footsteps.',
+      icon: 'AlertTriangle',
+      badge: 'Hazard',
+      data: 'TRAP',
+    },
+    {
+      minRoll: 15,
+      maxRoll: 16,
+      id: 'shrine_f1',
+      name: 'Sunlit Stone Altar',
+      subtitle: 'Shrine of the Dawn Goddess',
+      description: 'A beam of pure light illuminates a marble basin of blessed spring water.',
+      icon: 'Sun',
+      badge: 'Blessing',
+      data: 'SHRINE',
+    },
+    {
+      minRoll: 17,
+      maxRoll: 18,
+      id: 'campfire_f1',
+      name: 'Secluded Hearth',
+      subtitle: 'Campfire & Rest Haven',
+      description: 'A warm sheltered chimney nook where you can bandage wounds and eat rations.',
+      icon: 'Tent',
+      badge: 'Rest',
+      data: 'CAMPFIRE',
+    },
+    {
+      minRoll: 19,
+      maxRoll: 19,
+      id: 'merchant_f1',
+      name: "Olaf's Trade Outpost",
+      subtitle: 'Wandering Dungeon Merchant',
+      description: 'A stout pack mule and a lantern-lit carpet laden with weapons and potions.',
+      icon: 'Store',
+      badge: 'Shop',
+      data: 'MERCHANT',
+    },
+    {
+      minRoll: 20,
+      maxRoll: 20,
+      id: 'secret_f1',
+      name: 'Hidden Masonry Cache',
+      subtitle: 'Secret Vault & Bonus Relics',
+      description: 'A hollow wall stone reveals a concealed chamber stocked with ancient gold!',
+      icon: 'Sparkles',
+      badge: 'Secret',
+      data: 'SECRET',
+    },
+  ],
+};
+
+export const ROOM_TABLE_FLOOR_2: RollableTable<RoomType> = {
+  id: 'room_table_floor_2',
+  title: 'Sunken Mines Chamber Table (Floor 2)',
+  diceFormula: '1d20',
+  diceSides: 20,
+  diceCount: 1,
+  description: 'Roll 1d20 to discover what lies in the treacherous subterranean mine depths.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 9,
+      id: 'monster_f2',
+      name: 'Deep Mine Ambush',
+      subtitle: 'Lethal Beast (Roll 1d6)',
+      description: 'Cries echo through the mine shafts as vicious cave horrors advance.',
+      icon: 'Skull',
+      badge: 'High Danger',
+      data: 'MONSTER',
+    },
+    {
+      minRoll: 10,
+      maxRoll: 12,
+      id: 'treasure_f2',
+      name: 'Gilded Ore Vault',
+      subtitle: 'Heavy Reinforced Chest',
+      description: 'An ornate dwarven treasure chest locked behind ancient iron grating.',
+      icon: 'Package',
+      badge: 'Treasure',
+      data: 'TREASURE',
+    },
+    {
+      minRoll: 13,
+      maxRoll: 14,
+      id: 'trap_f2',
+      name: 'Collapsing Mine Shaft',
+      subtitle: 'Tripwire & Falling Rocks',
+      description: 'Creaking wooden timbers ready to collapse upon the unwary.',
+      icon: 'AlertTriangle',
+      badge: 'Hazard',
+      data: 'TRAP',
+    },
+    {
+      minRoll: 15,
+      maxRoll: 16,
+      id: 'shrine_f2',
+      name: 'Altar of the Mountain Gods',
+      subtitle: 'Dwarven Runestone Shrine',
+      description: 'Glowing sapphire runes pulse with invigorating earth magic.',
+      icon: 'Sun',
+      badge: 'Blessing',
+      data: 'SHRINE',
+    },
+    {
+      minRoll: 17,
+      maxRoll: 17,
+      id: 'campfire_f2',
+      name: 'Miner’s Sheltered Hearth',
+      subtitle: 'Campfire & Rest',
+      description: 'A cozy hollow with dry firewood and clean cave ventilation.',
+      icon: 'Tent',
+      badge: 'Rest',
+      data: 'CAMPFIRE',
+    },
+    {
+      minRoll: 18,
+      maxRoll: 19,
+      id: 'merchant_f2',
+      name: 'Deep Mining Caravan',
+      subtitle: 'Olaf the Merchant (Tier 2 Gear)',
+      description: 'Olaf has set up shop with upgraded armors, rings, and enchanted scrolls.',
+      icon: 'Store',
+      badge: 'Shop',
+      data: 'MERCHANT',
+    },
+    {
+      minRoll: 20,
+      maxRoll: 20,
+      id: 'secret_f2',
+      name: 'Dwarven Mithril Cache',
+      subtitle: 'Concealed Relic Vault',
+      description: 'Behind a false wall lies a hidden hoard of precious gems and relics.',
+      icon: 'Sparkles',
+      badge: 'Secret',
+      data: 'SECRET',
+    },
+  ],
+};
+
+export const ROOM_TABLE_FLOOR_3: RollableTable<RoomType> = {
+  id: 'room_table_floor_3',
+  title: 'Infernal Sanctum Chamber Table (Floor 3)',
+  diceFormula: '1d20',
+  diceSides: 20,
+  diceCount: 1,
+  description: 'Roll 1d20 in the burning heart of the volcano leading toward the Dragon’s Throne.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 9,
+      id: 'monster_f3',
+      name: 'Volcanic Hell-Beast',
+      subtitle: 'Infernal Monster (Roll 1d6)',
+      description: 'Demonic fiends and molten drakes guard the path to the Crimson Wyrm.',
+      icon: 'Skull',
+      badge: 'Deadly',
+      data: 'MONSTER',
+    },
+    {
+      minRoll: 10,
+      maxRoll: 12,
+      id: 'treasure_f3',
+      name: 'Obsidian Dragon-Hoard',
+      subtitle: 'Epic Treasure Vault',
+      description: 'Piles of molten gold, legendary weapons, and dragon scales.',
+      icon: 'Package',
+      badge: 'Epic Loot',
+      data: 'TREASURE',
+    },
+    {
+      minRoll: 13,
+      maxRoll: 14,
+      id: 'trap_f3',
+      name: 'Magma Vent & Flame Geyser',
+      subtitle: 'Superheated Blast Trap',
+      description: 'Jets of searing volcanic gas erupt with thunderous fury.',
+      icon: 'AlertTriangle',
+      badge: 'Deadly Trap',
+      data: 'TRAP',
+    },
+    {
+      minRoll: 15,
+      maxRoll: 16,
+      id: 'shrine_f3',
+      name: 'Altar of Primordial Fire',
+      subtitle: 'Sanctum of Dragon-Bane',
+      description: 'Channel primordial power to empower your weapons against dragon scales.',
+      icon: 'Flame',
+      badge: 'Empowerment',
+      data: 'SHRINE',
+    },
+    {
+      minRoll: 17,
+      maxRoll: 17,
+      id: 'campfire_f3',
+      name: 'Ashen Sanctuary Hearth',
+      subtitle: 'Final Rest before the Dragon',
+      description: 'Prepare your equipment and gather strength for the ultimate showdown.',
+      icon: 'Tent',
+      badge: 'Safe Rest',
+      data: 'CAMPFIRE',
+    },
+    {
+      minRoll: 18,
+      maxRoll: 19,
+      id: 'merchant_f3',
+      name: "Olaf's Dragon-Slayer Emporium",
+      subtitle: 'Legendary Gear Merchant',
+      description: 'Olaf brings his finest masterwork arms, dragon-slaying potions, and enchanted armor.',
+      icon: 'Store',
+      badge: 'Shop',
+      data: 'MERCHANT',
+    },
+    {
+      minRoll: 20,
+      maxRoll: 20,
+      id: 'secret_f3',
+      name: 'Vault of the Dragon-Slayers',
+      subtitle: 'Concealed Legendary Reliquary',
+      description: 'Ancient dragon-hunter weapons sealed away for centuries.',
+      icon: 'Sparkles',
+      badge: 'Legendary Secret',
+      data: 'SECRET',
+    },
+  ],
+};
+
+// ==========================================
+// 4. MONSTER LOOKUP TABLES
+// ==========================================
+export const MONSTER_TABLE_FLOOR_1: RollableTable<string> = {
+  id: 'monster_table_floor_1',
+  title: 'Floor 1: Catacomb Beast Table',
+  diceFormula: '1d6',
+  diceSides: 6,
+  diceCount: 1,
+  description: 'Roll 1d6 to determine which creature lunges from the catacomb darkness.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 1,
+      id: 'giant_rat',
+      name: 'Sewer Dire Rat',
+      subtitle: 'Level 1 • HP: 12 • AC: 11',
+      description: 'Feral diseased vermin with razor-sharp incisors and quick leaps.',
+      icon: 'Bug',
+      badge: 'Fast / Swarm',
+      data: 'giant_rat',
+    },
+    {
+      minRoll: 2,
+      maxRoll: 3,
+      id: 'goblin_skirmisher',
+      name: 'Goblin Skirmisher',
+      subtitle: 'Level 1 • HP: 16 • AC: 12',
+      description: 'Cackling scavenger with a serrated bone dagger and wooden shield.',
+      icon: 'Skull',
+      badge: 'Sneaky',
+      data: 'goblin_skirmisher',
+    },
+    {
+      minRoll: 4,
+      maxRoll: 4,
+      id: 'cave_bat_swarm',
+      name: 'Vampiric Bat Swarm',
+      subtitle: 'Level 1 • HP: 14 • AC: 13',
+      description: 'Fluttering cloud of razor-winged bats that screech and siphon blood.',
+      icon: 'Bug',
+      badge: 'Evasive',
+      data: 'cave_bat_swarm',
+    },
+    {
+      minRoll: 5,
+      maxRoll: 5,
+      id: 'skeleton_guard',
+      name: 'Skeleton Sentinel',
+      subtitle: 'Level 2 • HP: 22 • AC: 13',
+      description: 'Ancient animated bones wielding a notched iron sword and rusty shield.',
+      icon: 'Bone',
+      badge: 'Undead',
+      data: 'skeleton_guard',
+    },
+    {
+      minRoll: 6,
+      maxRoll: 6,
+      id: 'venom_spider',
+      name: 'Crypt Weaver Spider',
+      subtitle: 'Level 2 • HP: 20 • AC: 12',
+      description: 'Chitinous arachnid with dripping venomous fangs and sticky web traps.',
+      icon: 'Bug',
+      badge: 'Poisonous',
+      data: 'venom_spider',
+    },
+  ],
+};
+
+export const MONSTER_TABLE_FLOOR_2: RollableTable<string> = {
+  id: 'monster_table_floor_2',
+  title: 'Floor 2: Sunken Mine Horrors Table',
+  diceFormula: '1d6',
+  diceSides: 6,
+  diceCount: 1,
+  description: 'Roll 1d6 to spawn a dangerous subterranean foe in the sunken mines.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 1,
+      id: 'skeleton_guard',
+      name: 'Armored Skeleton Warrior',
+      subtitle: 'Level 2 • HP: 24 • AC: 14',
+      description: 'Undead legionnaire clad in chainmail with a heavy broadsword.',
+      icon: 'Bone',
+      badge: 'Armored Undead',
+      data: 'skeleton_guard',
+    },
+    {
+      minRoll: 2,
+      maxRoll: 2,
+      id: 'orc_berserker',
+      name: 'Orc Berserker',
+      subtitle: 'Level 3 • HP: 32 • AC: 13',
+      description: 'Frenzied savage wielding a two-handed greataxe with reckless fury.',
+      icon: 'Sword',
+      badge: 'High Damage',
+      data: 'orc_berserker',
+    },
+    {
+      minRoll: 3,
+      maxRoll: 3,
+      id: 'shadow_wraith',
+      name: 'Shadow Wraith',
+      subtitle: 'Level 3 • HP: 26 • AC: 14',
+      description: 'Ghostly phantom that phases through walls and saps your stamina.',
+      icon: 'Ghost',
+      badge: 'Ethereal',
+      data: 'shadow_wraith',
+    },
+    {
+      minRoll: 4,
+      maxRoll: 4,
+      id: 'cave_troll',
+      name: 'Sunken Cave Troll',
+      subtitle: 'Level 4 • HP: 38 • AC: 12',
+      description: 'Towering mossy behemoth capable of crushing blows and flesh regeneration.',
+      icon: 'Zap',
+      badge: 'Regeneration',
+      data: 'cave_troll',
+    },
+    {
+      minRoll: 5,
+      maxRoll: 5,
+      id: 'mimic_chest',
+      name: 'Dungeon Mimic',
+      subtitle: 'Level 3 • HP: 30 • AC: 13',
+      description: 'Deceptive predator shaped like an ornate chest with adhesive pseudopods.',
+      icon: 'Package',
+      badge: 'Ambush',
+      data: 'mimic_chest',
+    },
+    {
+      minRoll: 6,
+      maxRoll: 6,
+      id: 'stone_gargoyle',
+      name: 'Cursed Stone Gargoyle',
+      subtitle: 'Level 4 • HP: 34 • AC: 15',
+      description: 'Carved winged beast that animates with stony resilience.',
+      icon: 'Shield',
+      badge: 'High AC',
+      data: 'stone_gargoyle',
+    },
+  ],
+};
+
+export const MONSTER_TABLE_FLOOR_3: RollableTable<string> = {
+  id: 'monster_table_floor_3',
+  title: 'Floor 3: Infernal Sanctum Monsters',
+  diceFormula: '1d6',
+  diceSides: 6,
+  diceCount: 1,
+  description: 'Roll 1d6 to face the fiery guardians of the Crimson Wyrm’s Sanctum.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 1,
+      id: 'orc_berserker',
+      name: 'Infernal Warmaster',
+      subtitle: 'Level 4 • HP: 42 • AC: 14',
+      description: 'Hardened orc warlord wielding flaming axes and spiky iron armor.',
+      icon: 'Flame',
+      badge: 'Fire Cleave',
+      data: 'orc_berserker',
+    },
+    {
+      minRoll: 2,
+      maxRoll: 2,
+      id: 'fire_drake',
+      name: 'Flame Drake Hatchling',
+      subtitle: 'Level 5 • HP: 48 • AC: 15',
+      description: 'Winged reptilian beast spitting molten fireballs and lashing spiked tails.',
+      icon: 'Flame',
+      badge: 'Fire Breath',
+      data: 'fire_drake',
+    },
+    {
+      minRoll: 3,
+      maxRoll: 3,
+      id: 'shadow_wraith',
+      name: 'Dread Nether Wraith',
+      subtitle: 'Level 4 • HP: 36 • AC: 15',
+      description: 'Spectral nightmare that chills the soul and drains lifeforce.',
+      icon: 'Ghost',
+      badge: 'Drain Touch',
+      data: 'shadow_wraith',
+    },
+    {
+      minRoll: 4,
+      maxRoll: 4,
+      id: 'cave_troll',
+      name: 'Volcanic Magma Brute',
+      subtitle: 'Level 5 • HP: 54 • AC: 13',
+      description: 'Huge earthen titan surging with liquid magma across its cracked skin.',
+      icon: 'Zap',
+      badge: 'Magma Slam',
+      data: 'cave_troll',
+    },
+    {
+      minRoll: 5,
+      maxRoll: 6,
+      id: 'death_knight',
+      name: 'Cursed Death Knight',
+      subtitle: 'Level 5 • HP: 50 • AC: 16',
+      description: 'Fallen paladin wielding a runic soul-drinking blade in black armor.',
+      icon: 'Skull',
+      badge: 'Heavy Armor',
+      data: 'death_knight',
+    },
+  ],
+};
+
+// ==========================================
+// 5. MONSTER TRAIT & VARIATION TABLE (1d6)
+// ==========================================
+export interface MonsterTrait {
+  id: string;
+  name: string;
+  prefix: string;
+  description: string;
+  hpMod: number;
+  acMod: number;
+  attackMod: number;
+  damageBonus: number;
+  goldBonusMultiplier: number;
+  badge: string;
+  color: string;
+}
+
+export const MONSTER_TRAIT_TABLE: RollableTable<MonsterTrait> = {
+  id: 'monster_trait_table',
+  title: 'Monster Trait & Modifier Table',
+  diceFormula: '1d6',
+  diceSides: 6,
+  diceCount: 1,
+  description: 'Roll 1d6 to determine special mutation, temperament, or equipment of this encounter.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 1,
+      id: 'frenzied',
+      name: 'Frenzied / Rabid',
+      subtitle: '+2 Attack Bonus, -2 AC',
+      description: 'Foaming at the mouth and lunging with reckless, berserk bloodlust.',
+      icon: 'Flame',
+      badge: 'High Aggression',
+      data: {
+        id: 'frenzied',
+        name: 'Frenzied',
+        prefix: 'Rabid',
+        description: 'Reckless attacker with +2 Attack Bonus, but -2 Armor Class.',
+        hpMod: 0,
+        acMod: -2,
+        attackMod: 2,
+        damageBonus: 1,
+        goldBonusMultiplier: 1.1,
+        badge: 'Rabid',
+        color: 'text-amber-400',
+      },
+    },
+    {
+      minRoll: 2,
+      maxRoll: 2,
+      id: 'armored',
+      name: 'Thick-Skinned / Armored',
+      subtitle: '+2 AC, +6 Max HP',
+      description: 'Heavily plated scales, bone spurs, or reinforced iron chainmail.',
+      icon: 'Shield',
+      badge: 'Resilient',
+      data: {
+        id: 'armored',
+        name: 'Armored',
+        prefix: 'Ironclad',
+        description: 'Tough hide granting +2 Armor Class and +6 extra HP.',
+        hpMod: 6,
+        acMod: 2,
+        attackMod: 0,
+        damageBonus: 0,
+        goldBonusMultiplier: 1.2,
+        badge: 'Ironclad',
+        color: 'text-blue-400',
+      },
+    },
+    {
+      minRoll: 3,
+      maxRoll: 3,
+      id: 'venomous',
+      name: 'Venomous / Corrosive',
+      subtitle: 'Attacks deal +2 Poison Damage',
+      description: 'Dripping toxic bile and noxious fluids from fangs or barbed claws.',
+      icon: 'Bug',
+      badge: 'Toxin',
+      data: {
+        id: 'venomous',
+        name: 'Venomous',
+        prefix: 'Noxious',
+        description: 'Strikes carry stinging toxins dealing +2 extra bonus damage.',
+        hpMod: 0,
+        acMod: 0,
+        attackMod: 1,
+        damageBonus: 2,
+        goldBonusMultiplier: 1.25,
+        badge: 'Toxic',
+        color: 'text-emerald-400',
+      },
+    },
+    {
+      minRoll: 4,
+      maxRoll: 4,
+      id: 'giant',
+      name: 'Elder Champion / Alpha',
+      subtitle: '+10 Max HP, +2 Damage',
+      description: 'A massive veteran of dozens of dungeon skirmishes, towering over its kin.',
+      icon: 'Crown',
+      badge: 'Alpha Elite',
+      data: {
+        id: 'giant',
+        name: 'Elder Alpha',
+        prefix: 'Giant',
+        description: 'Massive build with +10 Max HP and +2 damage on all attacks.',
+        hpMod: 10,
+        acMod: 1,
+        attackMod: 1,
+        damageBonus: 2,
+        goldBonusMultiplier: 1.5,
+        badge: 'Alpha Beast',
+        color: 'text-purple-400',
+      },
+    },
+    {
+      minRoll: 5,
+      maxRoll: 5,
+      id: 'swift',
+      name: 'Swift / Shadow-Stalker',
+      subtitle: '+2 AC (Evasion), +1 Attack',
+      description: 'Incredibly nimble and quick on its feet, weaving around sword swings.',
+      icon: 'Zap',
+      badge: 'Evasive',
+      data: {
+        id: 'swift',
+        name: 'Shadow-Stalker',
+        prefix: 'Swift',
+        description: 'Extreme agility granting +2 AC and +1 Attack Bonus.',
+        hpMod: -2,
+        acMod: 2,
+        attackMod: 1,
+        damageBonus: 0,
+        goldBonusMultiplier: 1.2,
+        badge: 'Nimble',
+        color: 'text-cyan-400',
+      },
+    },
+    {
+      minRoll: 6,
+      maxRoll: 6,
+      id: 'hoarder',
+      name: 'Wealthy Hoarder',
+      subtitle: 'Double Gold & Guaranteed Bonus Loot',
+      description: 'Laden with stolen adventurer satchels, rings, and gem-encrusted pouches!',
+      icon: 'Coins',
+      badge: 'Treasure Carrier',
+      data: {
+        id: 'hoarder',
+        name: 'Wealthy Hoarder',
+        prefix: 'Gilded',
+        description: 'Carries a rich stash! Yields 2x Gold and guaranteed bonus items.',
+        hpMod: 4,
+        acMod: 0,
+        attackMod: 0,
+        damageBonus: 0,
+        goldBonusMultiplier: 2.5,
+        badge: 'Treasure Hoarder',
+        color: 'text-amber-300',
+      },
+    },
+  ],
+};
+
+// ==========================================
+// 6. LOOT & TREASURE TABLES (1d20)
+// ==========================================
+export interface LootRewardResult {
+  goldFormula: string;
+  itemId?: string;
+  itemRarity?: string;
+  description: string;
+}
+
+export const LOOT_TABLE_CHEST: RollableTable<LootRewardResult> = {
+  id: 'loot_table_chest',
+  title: 'Dungeon Vault & Chest Loot Table',
+  diceFormula: '1d20',
+  diceSides: 20,
+  diceCount: 1,
+  description: 'Roll 1d20 to loot the treasures of chests, vaults, and slain boss monsters.',
+  rows: [
+    {
+      minRoll: 1,
+      maxRoll: 4,
+      id: 'loot_common',
+      name: 'Adventurer Supplies & Minor Gold',
+      subtitle: '2d6 Gold + Rations / Minor Potion',
+      description: 'A modest stash of silver coins and useful supplies left by past explorers.',
+      icon: 'Package',
+      badge: 'Common Loot',
+      data: {
+        goldFormula: '2d6+5',
+        itemId: 'minor_healing_potion',
+        itemRarity: 'common',
+        description: 'Gold coins and a Minor Healing Potion',
+      },
+    },
+    {
+      minRoll: 5,
+      maxRoll: 9,
+      id: 'loot_uncommon_supplies',
+      name: 'Apothecary Stash & Torch Bundle',
+      subtitle: '3d6 Gold + Healing Potion & Lockpicks',
+      description: 'Glass phials of red rejuvenation nectar and tempered iron lockpicks.',
+      icon: 'Heart',
+      badge: 'Uncommon Loot',
+      data: {
+        goldFormula: '3d6+10',
+        itemId: 'healing_potion',
+        itemRarity: 'uncommon',
+        description: 'Gold coins and an Alchemical Healing Potion',
+      },
+    },
+    {
+      minRoll: 10,
+      maxRoll: 14,
+      id: 'loot_weapons_armor',
+      name: 'Tempered Steel Arms or Armor',
+      subtitle: '4d6 Gold + Steel Broadsword / Chainmail',
+      description: 'Fine steel forged by dwarven smiths, sharp and battle-ready.',
+      icon: 'Sword',
+      badge: 'Rare Gear',
+      data: {
+        goldFormula: '4d6+15',
+        itemId: 'steel_broadsword',
+        itemRarity: 'uncommon',
+        description: 'Heavy gold sack and a finely balanced Steel Broadsword',
+      },
+    },
+    {
+      minRoll: 15,
+      maxRoll: 18,
+      id: 'loot_rare_enchantment',
+      name: 'Enchanted Rings & Magic Wands',
+      subtitle: '5d6 Gold + Ring of Protection / Wand of Cinders',
+      description: 'Magical jewelry humming with arcane energy and defensive blessings.',
+      icon: 'Sparkles',
+      badge: 'Rare Magic Item',
+      data: {
+        goldFormula: '5d6+25',
+        itemId: 'ring_of_protection',
+        itemRarity: 'rare',
+        description: 'Pouch of gold gems and an enchanted Ring of Protection',
+      },
+    },
+    {
+      minRoll: 19,
+      maxRoll: 20,
+      id: 'loot_epic_relic',
+      name: 'Ancient Relic & Dragon-Bane Artifact',
+      subtitle: '8d6 Gold + Dragonslayer Blade / Amulet',
+      description: 'A legendary masterwork relic from the forgotten dragon wars!',
+      icon: 'Flame',
+      badge: 'Epic Masterwork',
+      data: {
+        goldFormula: '8d6+50',
+        itemId: 'dragonslayer_greatsword',
+        itemRarity: 'epic',
+        description: 'Massive chest of pure gold and the legendary Dragonslayer Greatblade!',
+      },
+    },
+  ],
+};
+
+/**
+ * Helper to get a table row given a roll result
+ */
+export function lookupTableRow<T>(table: RollableTable<T>, roll: number): TableRow<T> {
+  const found = table.rows.find((r) => roll >= r.minRoll && roll <= r.maxRoll);
+  if (found) return found;
+  return table.rows[table.rows.length - 1];
+}
