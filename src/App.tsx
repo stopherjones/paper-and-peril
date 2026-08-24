@@ -42,6 +42,7 @@ import { TableInspectorModal } from './components/TableInspectorModal';
 import { generateDungeonFloor } from './utils/generator';
 import { saveGameState, loadGameState, clearGameState } from './utils/storage';
 import { sounds } from './utils/audio';
+import { rollDice, getStatModifier } from './utils/dice';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>(() => {
