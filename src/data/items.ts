@@ -293,6 +293,17 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
     statBonuses: { INT: 3, CON: 2, LCK: 2 },
     icon: 'Gem',
   },
+  warding_talisman: {
+    id: 'warding_talisman',
+    name: 'Silver Warding Amulet',
+    description: 'An engraved silver talisman that deflects incoming blows and curses (+1 Armor Class, +1 Luck).',
+    type: 'amulet',
+    rarity: 'uncommon',
+    value: 35,
+    armorBonus: 1,
+    statBonuses: { LCK: 1 },
+    icon: 'Shield',
+  },
 
   // --- CONSUMABLES (POTIONS & SCROLLS) ---
   minor_healing_potion: {
@@ -416,7 +427,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   dungeon_torch: {
     id: 'dungeon_torch',
     name: 'Pitch Torch',
-    description: 'Peek and flip face-up all adjacent room cards on the grid (even across walls).',
+    description: 'Illuminate and reveal an unrevealed adjacent room card not blocked by a solid wall.',
     type: 'tool',
     rarity: 'common',
     value: 5,
@@ -427,7 +438,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   brass_spyglass: {
     id: 'brass_spyglass',
     name: "Burglar's Spyglass",
-    description: 'A collapsible brass scope that lets you peek and reveal any adjacent room tile without stepping onto it.',
+    description: 'A collapsible brass scope that lets you peek and reveal any unobstructed adjacent room tile without consuming a torch.',
     type: 'tool',
     rarity: 'uncommon',
     value: 28,

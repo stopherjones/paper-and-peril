@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Compass,
   Flame,
@@ -25,6 +25,8 @@ import {
   Maximize2,
   CheckCircle2,
   ArrowDownCircle,
+  X,
+  Ghost,
 } from 'lucide-react';
 import { DungeonFloor, DungeonRoom, GameItem, HeroCharacter, RoomType } from '../types/game';
 import { sounds } from '../utils/audio';
@@ -40,11 +42,14 @@ interface DungeonMapProps {
   floor: DungeonFloor;
   currentRoomId: string;
   hero: HeroCharacter;
+  activeMapAction?: 'TORCH' | 'CLAIRVOYANCE' | 'SPYGLASS' | 'SMASH_WALL' | 'PHASE_WALL' | null;
+  onClearMapAction?: () => void;
   onSelectAdjacentRoom: (targetRoomId: string) => void;
   onSmashWall: (wallId: string, item: GameItem) => void;
   onPhaseThroughWall: (targetRoomId: string, item?: GameItem) => void;
   onUseTorch: (targetRoomId: string) => void;
   onUseClairvoyance: (targetRoomId: string) => void;
+  onUseSpyglass?: (targetRoomId: string) => void;
   onOpenCurrentRoom?: () => void;
   onDescendFloor?: () => void;
 }
@@ -53,18 +58,46 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
   floor,
   currentRoomId,
   hero,
+  activeMapAction,
+  onClearMapAction,
   onSelectAdjacentRoom,
   onSmashWall,
   onPhaseThroughWall,
   onUseTorch,
   onUseClairvoyance,
+  onUseSpyglass,
   onOpenCurrentRoom,
   onDescendFloor,
 }) => {
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
-  const [isClairvoyanceMode, setIsClairvoyanceMode] = useState(false);
-  const [isTorchTargetMode, setIsTorchTargetMode] = useState(false);
+  const [localMapAction, setLocalMapAction] = useState<
+    'TORCH' | 'CLAIRVOYANCE' | 'SPYGLASS' | 'SMASH_WALL' | 'PHASE_WALL' | null
+  >(null);
   const [showChamberMix, setShowChamberMix] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  // Synchronize incoming activeMapAction
+  useEffect(() => {
+    if (activeMapAction) {
+      setLocalMapAction(activeMapAction);
+    }
+  }, [activeMapAction]);
+
+  // Clear temporary alert message after 4 seconds
+  useEffect(() => {
+    if (alertMessage) {
+      const timer = setTimeout(() => setAlertMessage(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [alertMessage]);
+
+  const currentMode = activeMapAction || localMapAction;
+
+  const handleClearMode = () => {
+    setLocalMapAction(null);
+    if (onClearMapAction) onClearMapAction();
+    setAlertMessage(null);
+  };
 
   const currentRoom = floor.rooms[currentRoomId] || floor.rooms[floor.startRoomId];
   const allRooms: DungeonRoom[] = Object.values(floor.rooms);
@@ -153,38 +186,142 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
   );
   const isCurrentRoomMovementBlocked = isCurrentRoomBlockedByMonster || isCurrentRoomBlockedByTrap;
 
+  // Handle tile interactions
   const handleTileClick = (targetRoom: DungeonRoom) => {
     if (!currentRoom) return;
 
-    if (isClairvoyanceMode) {
-      sounds.playSpell();
-      onUseClairvoyance(targetRoom.id);
-      setIsClairvoyanceMode(false);
-      return;
-    }
-
-    if (isTorchTargetMode) {
-      const isAdjacent = areCoordinatesAdjacent(
-        { x: currentRoom.gridX, y: currentRoom.gridY },
-        { x: targetRoom.gridX, y: targetRoom.gridY }
-      );
-      if (isAdjacent && !targetRoom.isRevealed) {
-        sounds.playDiceRoll();
-        onUseTorch(targetRoom.id);
-        setIsTorchTargetMode(false);
+    // 1. CLAIRVOYANCE MODE (can reveal ANY room card on the 4x4 board, ignoring walls)
+    if (currentMode === 'CLAIRVOYANCE') {
+      if (!targetRoom.isRevealed) {
+        sounds.playSpell();
+        onUseClairvoyance(targetRoom.id);
+        handleClearMode();
         setSelectedCellId(targetRoom.id);
-      } else if (targetRoom.isRevealed) {
-        // Already revealed
-        setSelectedCellId(targetRoom.id);
-        setIsTorchTargetMode(false);
       } else {
-        // Not adjacent
-        sounds.playBlock();
+        setSelectedCellId(targetRoom.id);
+        handleClearMode();
       }
       return;
     }
 
-    // If clicked current room, select/inspect it and trigger opening current room modal (except CAMPFIRE)
+    // 2. TORCH MODE (can only illuminate an adjacent room NOT BLOCKED by solid unbroken wall)
+    if (currentMode === 'TORCH') {
+      const isAdjacent = areCoordinatesAdjacent(
+        { x: currentRoom.gridX, y: currentRoom.gridY },
+        { x: targetRoom.gridX, y: targetRoom.gridY }
+      );
+
+      if (!isAdjacent) {
+        sounds.playBlock();
+        setAlertMessage('A Pitch Torch can only illuminate an adjacent room.');
+        return;
+      }
+
+      // Check wall between current room and target room
+      const wall = findWallBetween(
+        { x: currentRoom.gridX, y: currentRoom.gridY },
+        { x: targetRoom.gridX, y: targetRoom.gridY }
+      );
+      const isWallBlocked = wall && !wall.isBroken;
+
+      if (isWallBlocked) {
+        sounds.playBlock();
+        setAlertMessage('Solid Stone Wall blocks the torchlight! You cannot peek through solid stone walls. Break the wall or cast Clairvoyance.');
+        return;
+      }
+
+      if (!targetRoom.isRevealed) {
+        sounds.playDiceRoll();
+        onUseTorch(targetRoom.id);
+        handleClearMode();
+        setSelectedCellId(targetRoom.id);
+      } else {
+        setSelectedCellId(targetRoom.id);
+        handleClearMode();
+      }
+      return;
+    }
+
+    // 3. SPYGLASS MODE (peeks adjacent unobstructed room without consuming torch)
+    if (currentMode === 'SPYGLASS') {
+      const isAdjacent = areCoordinatesAdjacent(
+        { x: currentRoom.gridX, y: currentRoom.gridY },
+        { x: targetRoom.gridX, y: targetRoom.gridY }
+      );
+
+      if (!isAdjacent) {
+        sounds.playBlock();
+        setAlertMessage("The Burglar's Spyglass can only scout adjacent rooms.");
+        return;
+      }
+
+      const wall = findWallBetween(
+        { x: currentRoom.gridX, y: currentRoom.gridY },
+        { x: targetRoom.gridX, y: targetRoom.gridY }
+      );
+      const isWallBlocked = wall && !wall.isBroken;
+
+      if (isWallBlocked) {
+        sounds.playBlock();
+        setAlertMessage('Solid Stone Wall blocks line of sight! The spyglass cannot see through stone walls.');
+        return;
+      }
+
+      if (!targetRoom.isRevealed) {
+        sounds.playDiceRoll();
+        if (onUseSpyglass) onUseSpyglass(targetRoom.id);
+        else onUseTorch(targetRoom.id);
+        handleClearMode();
+        setSelectedCellId(targetRoom.id);
+      } else {
+        setSelectedCellId(targetRoom.id);
+        handleClearMode();
+      }
+      return;
+    }
+
+    // 4. PHASE WALL MODE
+    if (currentMode === 'PHASE_WALL') {
+      const isAdjacent = areCoordinatesAdjacent(
+        { x: currentRoom.gridX, y: currentRoom.gridY },
+        { x: targetRoom.gridX, y: targetRoom.gridY }
+      );
+
+      if (!isAdjacent) {
+        sounds.playBlock();
+        setAlertMessage('Phasing only allows slipping through into an adjacent chamber.');
+        return;
+      }
+
+      sounds.playSpell();
+      onPhaseThroughWall(targetRoom.id, hasPhasingPotion?.item);
+      handleClearMode();
+      return;
+    }
+
+    // 5. SMASH WALL MODE (clicking cell adjacent with wall)
+    if (currentMode === 'SMASH_WALL') {
+      const isAdjacent = areCoordinatesAdjacent(
+        { x: currentRoom.gridX, y: currentRoom.gridY },
+        { x: targetRoom.gridX, y: targetRoom.gridY }
+      );
+
+      if (isAdjacent && hasBreachingTool) {
+        const wall = findWallBetween(
+          { x: currentRoom.gridX, y: currentRoom.gridY },
+          { x: targetRoom.gridX, y: targetRoom.gridY }
+        );
+        if (wall && !wall.isBroken) {
+          sounds.playHit();
+          onSmashWall(wall.id, hasBreachingTool.item);
+          handleClearMode();
+          setSelectedCellId(targetRoom.id);
+          return;
+        }
+      }
+    }
+
+    // Standard Tile Selection & Navigation
     if (targetRoom.id === currentRoomId) {
       setSelectedCellId(targetRoom.id);
       if (onOpenCurrentRoom && targetRoom.type !== 'CAMPFIRE') {
@@ -199,7 +336,6 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
     );
 
     if (isAdjacent) {
-      // If blocked by combat or active trap in current room, just select and play error/block sound
       if (isCurrentRoomMovementBlocked) {
         if (isCurrentRoomBlockedByTrap) sounds.playTrap();
         else sounds.playBlock();
@@ -215,16 +351,13 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
       const isWallBlocked = wall && !wall.isBroken;
 
       if (!isWallBlocked) {
-        // Open passage: navigate directly
         sounds.playBlock();
         onSelectAdjacentRoom(targetRoom.id);
       } else {
-        // Blocked by wall: select cell so user can smash or phase
         sounds.playBlock();
         setSelectedCellId(targetRoom.id);
       }
     } else {
-      // Non-adjacent: select to view info
       setSelectedCellId(targetRoom.id);
     }
   };
@@ -277,52 +410,141 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
           </div>
         </div>
 
-        {/* Quick Scout Tools & Legend */}
-        <div className="flex items-center gap-1.5">
+        {/* Quick Scout Tools & Actions */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <div
-            className="hidden sm:flex items-center gap-1 text-[10px] font-serif text-amber-200/90 bg-[#26170d] px-2 py-1 rounded border border-[#6e3e18]"
+            className="hidden xl:flex items-center gap-1 text-[10px] font-serif text-amber-200/90 bg-[#26170d] px-2 py-1 rounded border border-[#6e3e18]"
             title="Candidate locations where the Floor Guardian & Descent Stairs can spawn (outer perimeter & deep alcoves)"
           >
             <Crown className="w-3 h-3 text-amber-400" />
             <span>8 Stairs Candidates</span>
           </div>
 
+          {/* Torch Button */}
           {hero.torches > 0 && (
             <button
               id="btn-use-torch-map"
               onClick={() => {
-                if (selectedRoom && isSelectedAdjacent && !selectedRoom.isRevealed) {
+                if (currentMode === 'TORCH') {
+                  handleClearMode();
+                } else if (
+                  selectedRoom &&
+                  isSelectedAdjacent &&
+                  !selectedRoom.isRevealed &&
+                  (!wallToSelected || wallToSelected.isBroken)
+                ) {
                   sounds.playDiceRoll();
                   onUseTorch(selectedRoom.id);
                 } else {
-                  setIsTorchTargetMode(!isTorchTargetMode);
+                  setLocalMapAction('TORCH');
+                  setAlertMessage(null);
                 }
               }}
-              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-colors cursor-pointer shadow-sm border ${
-                isTorchTargetMode
-                  ? 'bg-orange-950 border-orange-500 text-orange-200 animate-pulse'
+              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-all cursor-pointer shadow-sm border ${
+                currentMode === 'TORCH'
+                  ? 'bg-orange-900 border-orange-400 text-orange-100 ring-2 ring-orange-500 animate-pulse font-bold'
                   : 'bg-[#442d17] hover:bg-[#5a3c1f] text-orange-200 border-[#855427]'
               }`}
-              title="Click an adjacent unrevealed room to light and reveal it (Uses 1 Torch)"
+              title="Click an adjacent unrevealed room (not blocked by a solid wall) to illuminate it (Uses 1 Torch)"
             >
               <Flame className="w-3.5 h-3.5 text-orange-400" />
-              <span>{isTorchTargetMode ? 'Select Room' : `Torch (${hero.torches})`}</span>
+              <span>{currentMode === 'TORCH' ? 'Torch Mode ✕' : `Torch (${hero.torches})`}</span>
             </button>
           )}
 
+          {/* Clairvoyance Scroll Button */}
           {hasClairvoyanceScroll && (
             <button
               id="btn-clairvoyance-mode"
-              onClick={() => setIsClairvoyanceMode(!isClairvoyanceMode)}
-              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-colors cursor-pointer shadow-sm border ${
-                isClairvoyanceMode
-                  ? 'bg-purple-900 border-purple-400 text-purple-200 animate-pulse'
+              onClick={() => {
+                if (currentMode === 'CLAIRVOYANCE') {
+                  handleClearMode();
+                } else {
+                  setLocalMapAction('CLAIRVOYANCE');
+                  setAlertMessage(null);
+                }
+              }}
+              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-all cursor-pointer shadow-sm border ${
+                currentMode === 'CLAIRVOYANCE'
+                  ? 'bg-purple-900 border-purple-300 text-purple-100 ring-2 ring-purple-400 animate-pulse font-bold'
                   : 'bg-[#3b2347] hover:bg-[#4f2f5e] border-[#78468f] text-purple-200'
               }`}
-              title="Cast Clairvoyance to reveal any card on the board"
+              title="Cast Clairvoyance to reveal any card on the 4x4 board"
             >
               <Eye className="w-3.5 h-3.5 text-purple-400" />
-              <span>{isClairvoyanceMode ? 'Click Any Tile' : 'Clairvoyance'}</span>
+              <span>{currentMode === 'CLAIRVOYANCE' ? 'Clairvoyance ✕' : 'Clairvoyance'}</span>
+            </button>
+          )}
+
+          {/* Spyglass Button */}
+          {hasSpyglass && (
+            <button
+              id="btn-spyglass-mode"
+              onClick={() => {
+                if (currentMode === 'SPYGLASS') {
+                  handleClearMode();
+                } else {
+                  setLocalMapAction('SPYGLASS');
+                  setAlertMessage(null);
+                }
+              }}
+              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-all cursor-pointer shadow-sm border ${
+                currentMode === 'SPYGLASS'
+                  ? 'bg-amber-900 border-amber-400 text-amber-100 ring-2 ring-amber-400 animate-pulse font-bold'
+                  : 'bg-[#382b19] hover:bg-[#4d3a22] border-[#73532c] text-amber-200'
+              }`}
+              title="Scout an adjacent unobstructed room with your brass spyglass"
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-300" />
+              <span>{currentMode === 'SPYGLASS' ? 'Spyglass ✕' : 'Spyglass'}</span>
+            </button>
+          )}
+
+          {/* Wall Breaching Tool Button */}
+          {hasBreachingTool && (
+            <button
+              id="btn-breach-mode"
+              onClick={() => {
+                if (currentMode === 'SMASH_WALL') {
+                  handleClearMode();
+                } else {
+                  setLocalMapAction('SMASH_WALL');
+                  setAlertMessage(null);
+                }
+              }}
+              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-all cursor-pointer shadow-sm border ${
+                currentMode === 'SMASH_WALL'
+                  ? 'bg-red-950 border-red-400 text-red-100 ring-2 ring-red-500 animate-pulse font-bold'
+                  : 'bg-[#401d18] hover:bg-[#572720] border-[#8a3c31] text-red-200'
+              }`}
+              title="Smash adjacent solid stone wall into an archway"
+            >
+              <Hammer className="w-3.5 h-3.5 text-amber-400" />
+              <span>{currentMode === 'SMASH_WALL' ? 'Smash Wall ✕' : 'Smash Wall'}</span>
+            </button>
+          )}
+
+          {/* Phasing Button */}
+          {(isWearingEtherealRing || hasPhasingPotion) && (
+            <button
+              id="btn-phasing-mode"
+              onClick={() => {
+                if (currentMode === 'PHASE_WALL') {
+                  handleClearMode();
+                } else {
+                  setLocalMapAction('PHASE_WALL');
+                  setAlertMessage(null);
+                }
+              }}
+              className={`px-2 py-1 rounded text-[11px] font-serif flex items-center gap-1 transition-all cursor-pointer shadow-sm border ${
+                currentMode === 'PHASE_WALL'
+                  ? 'bg-indigo-950 border-indigo-400 text-indigo-100 ring-2 ring-indigo-400 animate-pulse font-bold'
+                  : 'bg-[#291b3d] hover:bg-[#3b2757] border-[#654394] text-indigo-200'
+              }`}
+              title="Slip through a solid stone wall into an adjacent room"
+            >
+              <Ghost className="w-3.5 h-3.5 text-indigo-300" />
+              <span>{currentMode === 'PHASE_WALL' ? 'Phase ✕' : 'Phase Wall'}</span>
             </button>
           )}
         </div>
@@ -341,7 +563,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
             <button
               id="btn-close-chamber-mix"
               onClick={() => setShowChamberMix(false)}
-              className="text-[10px] font-mono text-stone-400 hover:text-stone-100 px-1.5 py-0.5 bg-[#2a1a10] rounded border border-[#523821]"
+              className="text-[10px] font-mono text-stone-400 hover:text-stone-100 px-1.5 py-0.5 bg-[#2a1a10] rounded border border-[#523821] cursor-pointer"
             >
               ✕ Close
             </button>
@@ -425,19 +647,110 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
         </div>
       )}
 
-      {/* Torch Mode Banner Notification */}
-      {isTorchTargetMode && (
-        <div className="mb-2.5 p-2 bg-orange-950/90 border border-orange-500 rounded text-center text-xs font-serif text-orange-200 animate-pulse flex items-center justify-center gap-1.5">
-          <Flame className="w-4 h-4 text-orange-400" />
-          <span>Torch Lit: Click any adjacent unrevealed room to reveal it! (Uses 1 Torch)</span>
+      {/* Alert Warning Toast if Wall Blocks Action */}
+      {alertMessage && (
+        <div className="mb-2.5 p-2.5 bg-red-950/95 border-2 border-red-500 rounded-lg text-center text-xs font-serif text-red-200 animate-shake flex items-center justify-between gap-2 shadow-lg">
+          <div className="flex items-center gap-2 text-left">
+            <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+            <span>{alertMessage}</span>
+          </div>
+          <button
+            onClick={() => setAlertMessage(null)}
+            className="text-stone-400 hover:text-stone-100 text-xs px-1.5 py-0.5 rounded bg-[#331111] border border-red-700 cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
       )}
 
-      {/* Clairvoyance Banner Notification */}
-      {isClairvoyanceMode && (
-        <div className="mb-2.5 p-1.5 bg-purple-950/80 border border-purple-500 rounded text-center text-xs font-serif text-purple-200 animate-pulse flex items-center justify-center gap-1.5">
-          <Eye className="w-4 h-4 text-purple-300" />
-          <span>Select any room card on the 4x4 grid to peek with Clairvoyance!</span>
+      {/* Active Targeting Mode Notification Banners */}
+      {currentMode === 'TORCH' && (
+        <div className="mb-2.5 p-2.5 bg-gradient-to-r from-orange-950/90 via-[#3d1e0a] to-orange-950/90 border-2 border-orange-500 rounded-lg text-xs font-serif text-orange-200 flex items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-orange-400 animate-bounce shrink-0" />
+            <span>
+              <strong>Pitch Torch Lit:</strong> Click any pulsing orange adjacent room to reveal it. (Solid stone walls block torchlight!)
+            </span>
+          </div>
+          <button
+            id="btn-cancel-torch-mode"
+            onClick={handleClearMode}
+            className="px-2 py-0.5 bg-orange-900 hover:bg-orange-800 text-orange-100 rounded border border-orange-400 text-[11px] font-bold cursor-pointer shrink-0"
+          >
+            Cancel [✕]
+          </button>
+        </div>
+      )}
+
+      {currentMode === 'CLAIRVOYANCE' && (
+        <div className="mb-2.5 p-2.5 bg-gradient-to-r from-purple-950/90 via-[#311742] to-purple-950/90 border-2 border-purple-400 rounded-lg text-xs font-serif text-purple-200 flex items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-purple-300 animate-pulse shrink-0" />
+            <span>
+              <strong>Arcane Clairvoyance Active:</strong> Click ANY room card on the 4x4 grid (pulsing violet) to reveal it through arcane sight! (Spans through walls)
+            </span>
+          </div>
+          <button
+            id="btn-cancel-clairvoyance-mode"
+            onClick={handleClearMode}
+            className="px-2 py-0.5 bg-purple-900 hover:bg-purple-800 text-purple-100 rounded border border-purple-300 text-[11px] font-bold cursor-pointer shrink-0"
+          >
+            Cancel [✕]
+          </button>
+        </div>
+      )}
+
+      {currentMode === 'SPYGLASS' && (
+        <div className="mb-2.5 p-2.5 bg-gradient-to-r from-amber-950/90 via-[#3b2b13] to-amber-950/90 border-2 border-amber-400 rounded-lg text-xs font-serif text-amber-200 flex items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <Compass className="w-4 h-4 text-amber-300 animate-spin shrink-0" />
+            <span>
+              <strong>Burglar's Spyglass Active:</strong> Click an unobstructed adjacent room (pulsing amber) to scout it without spending a torch.
+            </span>
+          </div>
+          <button
+            id="btn-cancel-spyglass-mode"
+            onClick={handleClearMode}
+            className="px-2 py-0.5 bg-amber-900 hover:bg-amber-800 text-amber-100 rounded border border-amber-300 text-[11px] font-bold cursor-pointer shrink-0"
+          >
+            Cancel [✕]
+          </button>
+        </div>
+      )}
+
+      {currentMode === 'SMASH_WALL' && (
+        <div className="mb-2.5 p-2.5 bg-gradient-to-r from-red-950/90 via-[#3b1712] to-red-950/90 border-2 border-red-500 rounded-lg text-xs font-serif text-red-200 flex items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <Hammer className="w-4 h-4 text-amber-400 animate-bounce shrink-0" />
+            <span>
+              <strong>Breaching Tool Ready:</strong> Click an adjacent solid wall or room separated by stone to smash it into an archway!
+            </span>
+          </div>
+          <button
+            id="btn-cancel-smash-mode"
+            onClick={handleClearMode}
+            className="px-2 py-0.5 bg-red-900 hover:bg-red-800 text-red-100 rounded border border-red-400 text-[11px] font-bold cursor-pointer shrink-0"
+          >
+            Cancel [✕]
+          </button>
+        </div>
+      )}
+
+      {currentMode === 'PHASE_WALL' && (
+        <div className="mb-2.5 p-2.5 bg-gradient-to-r from-indigo-950/90 via-[#26173d] to-indigo-950/90 border-2 border-indigo-400 rounded-lg text-xs font-serif text-indigo-200 flex items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <Ghost className="w-4 h-4 text-indigo-300 animate-pulse shrink-0" />
+            <span>
+              <strong>Phasing Active:</strong> Click an adjacent room across a solid stone wall to slip right through the stone!
+            </span>
+          </div>
+          <button
+            id="btn-cancel-phase-mode"
+            onClick={handleClearMode}
+            className="px-2 py-0.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-100 rounded border border-indigo-300 text-[11px] font-bold cursor-pointer shrink-0"
+          >
+            Cancel [✕]
+          </button>
         </div>
       )}
 
@@ -528,10 +841,27 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                           )
                         : null;
 
+                    const isWallTargetInSmash =
+                      currentMode === 'SMASH_WALL' &&
+                      hWall &&
+                      !hWall.isBroken &&
+                      currentRoom &&
+                      ((cell.id === currentRoom.id && aboveCell.id) ||
+                        (aboveCell.id === currentRoom.id && cell.id));
+
                     return (
                       <React.Fragment key={`hwall-${rIdx}-${cIdx}`}>
                         <div
-                          className="w-14 sm:w-16 flex items-center justify-center shrink-0"
+                          onClick={() => {
+                            if (hWall && !hWall.isBroken && hasBreachingTool) {
+                              sounds.playHit();
+                              onSmashWall(hWall.id, hasBreachingTool.item);
+                              handleClearMode();
+                            }
+                          }}
+                          className={`w-14 sm:w-16 flex items-center justify-center shrink-0 ${
+                            hWall && !hWall.isBroken && hasBreachingTool ? 'cursor-pointer' : ''
+                          }`}
                         >
                           {hWall ? (
                             hWall.isBroken ? (
@@ -541,8 +871,12 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                               />
                             ) : (
                               <div
-                                className="w-full h-2 bg-gradient-to-r from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-y border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413]"
-                                title="Solid Stone Wall (Blocks Movement)"
+                                className={`w-full h-2 bg-gradient-to-r from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-y border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413] transition-all ${
+                                  isWallTargetInSmash
+                                    ? 'ring-2 ring-red-400 bg-red-800 animate-pulse scale-110'
+                                    : ''
+                                }`}
+                                title="Solid Stone Wall (Blocks Movement & Torchlight)"
                               />
                             )
                           ) : (
@@ -586,6 +920,18 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                   const isBlockedByWall = wall && !wall.isBroken;
                   const isSelected = selectedCellId === room.id;
 
+                  // Target mode highlight indicators
+                  const isTorchTargetCandidate =
+                    currentMode === 'TORCH' && isAdjacent && !isRevealed && !isBlockedByWall;
+                  const isTorchBlockedCandidate =
+                    currentMode === 'TORCH' && isAdjacent && !isRevealed && isBlockedByWall;
+                  const isClairvoyanceTargetCandidate =
+                    currentMode === 'CLAIRVOYANCE' && !isRevealed;
+                  const isSpyglassTargetCandidate =
+                    currentMode === 'SPYGLASS' && isAdjacent && !isRevealed && !isBlockedByWall;
+                  const isPhaseTargetCandidate =
+                    currentMode === 'PHASE_WALL' && isAdjacent && isBlockedByWall;
+
                   // Vertical wall to the right of this cell
                   const rightCell = row[cIdx + 1];
                   const vWall =
@@ -595,6 +941,14 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                       { x: rightCell.gridX, y: rightCell.gridY }
                     );
 
+                  const isVWallTargetInSmash =
+                    currentMode === 'SMASH_WALL' &&
+                    vWall &&
+                    !vWall.isBroken &&
+                    currentRoom &&
+                    ((room.id === currentRoom.id && rightCell.id) ||
+                      (rightCell.id === currentRoom.id && room.id));
+
                   return (
                     <React.Fragment key={room.id}>
                       {/* Room Card Tile */}
@@ -602,7 +956,15 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                         id={`map-card-tile-${room.id}`}
                         onClick={() => handleTileClick(room)}
                         className={`w-14 h-14 sm:w-16 sm:h-16 rounded-lg border-2 text-xs font-serif flex flex-col items-center justify-between p-1 relative transition-all duration-200 cursor-pointer shadow-md shrink-0 ${
-                          isCurrent
+                          isTorchTargetCandidate
+                            ? 'bg-[#3d2411] border-orange-400 ring-2 ring-orange-400 animate-pulse text-orange-200 scale-105 z-20 shadow-orange-900/60'
+                            : isClairvoyanceTargetCandidate
+                            ? 'bg-[#2d1742] border-purple-400 ring-2 ring-purple-400 animate-pulse text-purple-200 scale-105 z-20 shadow-purple-900/60'
+                            : isSpyglassTargetCandidate
+                            ? 'bg-[#3b2b13] border-amber-400 ring-2 ring-amber-400 animate-pulse text-amber-200 scale-105 z-20 shadow-amber-900/60'
+                            : isPhaseTargetCandidate
+                            ? 'bg-[#29183d] border-indigo-400 ring-2 ring-indigo-400 animate-pulse text-indigo-200 scale-105 z-20'
+                            : isCurrent
                             ? 'bg-[#523315] border-[#fae498] ring-2 ring-amber-400 text-amber-100 shadow-amber-950/80 scale-105 z-20'
                             : isSelected
                             ? 'bg-[#3b2818] border-amber-400 ring-1 ring-amber-300 text-amber-200'
@@ -664,6 +1026,26 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                                   : room.type.toLowerCase()}
                               </span>
                             </>
+                          ) : isTorchTargetCandidate ? (
+                            <div className="flex flex-col items-center justify-center text-orange-400 animate-bounce">
+                              <Flame className="w-4 h-4" />
+                              <span className="text-[7.5px] font-bold uppercase mt-0.5">Torch</span>
+                            </div>
+                          ) : isTorchBlockedCandidate ? (
+                            <div className="flex flex-col items-center justify-center opacity-60 text-stone-500">
+                              <ShieldAlert className="w-4 h-4 text-red-500/70" />
+                              <span className="text-[6.5px] font-bold text-red-400/80">Wall</span>
+                            </div>
+                          ) : isClairvoyanceTargetCandidate ? (
+                            <div className="flex flex-col items-center justify-center text-purple-300 animate-pulse">
+                              <Eye className="w-4 h-4" />
+                              <span className="text-[7.5px] font-bold uppercase mt-0.5">Peek</span>
+                            </div>
+                          ) : isSpyglassTargetCandidate ? (
+                            <div className="flex flex-col items-center justify-center text-amber-300 animate-pulse">
+                              <Compass className="w-4 h-4" />
+                              <span className="text-[7.5px] font-bold uppercase mt-0.5">Scout</span>
+                            </div>
                           ) : isBossCandidate ? (
                             /* Unrevealed Boss / Stairs Candidate Card Back */
                             <div className="flex flex-col items-center justify-center">
@@ -705,7 +1087,18 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
 
                       {/* Vertical Wall Between Columns */}
                       {cIdx < 3 && (
-                        <div className="w-2 flex items-center justify-center relative shrink-0">
+                        <div
+                          onClick={() => {
+                            if (vWall && !vWall.isBroken && hasBreachingTool) {
+                              sounds.playHit();
+                              onSmashWall(vWall.id, hasBreachingTool.item);
+                              handleClearMode();
+                            }
+                          }}
+                          className={`w-2 flex items-center justify-center relative shrink-0 ${
+                            vWall && !vWall.isBroken && hasBreachingTool ? 'cursor-pointer' : ''
+                          }`}
+                        >
                           {vWall ? (
                             vWall.isBroken ? (
                               <div
@@ -714,8 +1107,12 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                               />
                             ) : (
                               <div
-                                className="w-2 h-12 sm:h-14 bg-gradient-to-b from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-x border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413]"
-                                title="Solid Stone Wall (Blocks Movement)"
+                                className={`w-2 h-12 sm:h-14 bg-gradient-to-b from-[#8a5d3b] via-[#b58156] to-[#8a5d3b] border-x border-[#ffd29d] rounded-sm shadow-md ring-1 ring-[#3b2413] transition-all ${
+                                  isVWallTargetInSmash
+                                    ? 'ring-2 ring-red-400 bg-red-800 animate-pulse scale-110'
+                                    : ''
+                                }`}
+                                title="Solid Stone Wall (Blocks Movement & Torchlight)"
                               />
                             )
                           ) : (
@@ -820,25 +1217,33 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                 )
               )}
 
-              {/* If unrevealed & adjacent -> Torch Reveal Option */}
+              {/* If unrevealed & adjacent -> Torch Reveal Option (CHECKING SOLID WALL) */}
               {!selectedRoom.isRevealed && isSelectedAdjacent && (
-                hero.torches > 0 ? (
-                  <button
-                    id="btn-torch-selected-room"
-                    onClick={() => {
-                      sounds.playDiceRoll();
-                      onUseTorch(selectedRoom.id);
-                    }}
-                    className="px-3 py-1.5 bg-[#472a14] hover:bg-[#5e381b] text-orange-200 border border-[#915828] rounded text-xs font-serif font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
-                    title="Use 1 Torch to reveal this adjacent room without entering"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Light Torch to Reveal ({hero.torches} left)</span>
-                  </button>
+                !wallToSelected || wallToSelected.isBroken ? (
+                  hero.torches > 0 ? (
+                    <button
+                      id="btn-torch-selected-room"
+                      onClick={() => {
+                        sounds.playDiceRoll();
+                        onUseTorch(selectedRoom.id);
+                      }}
+                      className="px-3 py-1.5 bg-[#472a14] hover:bg-[#5e381b] text-orange-200 border border-[#915828] rounded text-xs font-serif font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                      title="Use 1 Torch to reveal this adjacent room without entering"
+                    >
+                      <Flame className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Light Torch to Reveal ({hero.torches} left)</span>
+                    </button>
+                  ) : (
+                    <div className="text-[11px] font-serif text-stone-400 bg-[#140e09] px-2.5 py-1.5 rounded border border-[#3d2716] flex items-center gap-1.5">
+                      <Flame className="w-3.5 h-3.5 text-stone-600" />
+                      <span>Hidden Face-Down (Torch required to scout without entering)</span>
+                    </div>
+                  )
                 ) : (
-                  <div className="text-[11px] font-serif text-stone-400 bg-[#140e09] px-2.5 py-1.5 rounded border border-[#3d2716] flex items-center gap-1.5">
-                    <Flame className="w-3.5 h-3.5 text-stone-600" />
-                    <span>Hidden Face-Down (Torch required to scout without entering)</span>
+                  /* Solid stone wall blocks torchlight! */
+                  <div className="text-[11px] font-serif text-red-300 bg-[#241310] px-2.5 py-1.5 rounded border border-red-800/70 flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    <span>Solid Stone Wall blocks torchlight. (Smash wall or use Clairvoyance)</span>
                   </div>
                 )
               )}
@@ -956,7 +1361,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
           <Store className="w-3 h-3 text-emerald-400" /> Shop
         </span>
         <span className="flex items-center gap-1">
-          <AlertTriangle className="w-3 h-3 text-yellow-500" /> Trap
+          <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" /> Trap
         </span>
       </div>
     </div>

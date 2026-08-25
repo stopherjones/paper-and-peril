@@ -4,6 +4,7 @@
  */
 
 import { GameState, ScoreRecord } from '../types/game';
+import { syncHeroSupplies } from './inventory';
 
 const SAVE_KEY = 'dungeon_dice_crawler_save_v1';
 const SCORES_KEY = 'dungeon_dice_crawler_hall_of_fame_v1';
@@ -46,6 +47,10 @@ export function loadGameState(): GameState | null {
           }
         }
       }
+    }
+
+    if (state && state.hero) {
+      syncHeroSupplies(state.hero);
     }
 
     return state;

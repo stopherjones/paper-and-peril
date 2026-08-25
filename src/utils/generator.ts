@@ -275,16 +275,16 @@ export function isRoomPassedThrough(room?: DungeonRoom | null): boolean {
     return !room.monster || room.monster.hp <= 0;
   }
   if (room.type === 'TRAP') {
-    return !!(room.trap?.disarmed || room.trap?.triggered);
+    return !!room.trap?.disarmed;
   }
   if (room.type === 'TREASURE') {
-    return !!room.chest?.isOpened;
+    return !!(room.chest?.isOpened || room.chest?.isFailed || room.chest?.isJammed);
   }
   if (room.type === 'SHRINE') {
     return !!room.shrine?.used;
   }
   if (room.type === 'SECRET') {
-    return !!(room.secret?.discovered || room.secret?.rewardClaimed);
+    return !!(room.secret?.discovered || room.secret?.rewardClaimed || room.secret?.isFailed);
   }
   if (room.type === 'STAIRS') {
     return !!room.isStairsUnlocked;
@@ -355,12 +355,12 @@ export function getRoomDisplayInfo(room: DungeonRoom): {
         isPassed: true,
       };
     }
-    if (room.trap?.triggered || isPassed) {
+    if (room.trap?.triggered) {
       return {
-        title: `${room.title} — Trap Expended`,
-        description: 'The spent trap mechanism lies broken and harmless against the flagstones. Safe to cross.',
-        statusBadge: 'Trap Expended',
-        isPassed: true,
+        title: `${room.title} — Active Trap (Sprung)`,
+        description: 'The trap sprung and remains fully armed and hazardous! Disarm the mechanism to advance forward, or retreat back the way you came.',
+        statusBadge: 'Trap Armed & Active',
+        isPassed: false,
       };
     }
     return {
@@ -372,11 +372,19 @@ export function getRoomDisplayInfo(room: DungeonRoom): {
   }
 
   if (room.type === 'TREASURE') {
-    if (isPassed) {
+    if (room.chest?.isOpened) {
       return {
         title: `${room.title} — Vault Claimed`,
         description: 'The reinforced iron chest stands wide open and empty. All gold and relics have been collected.',
         statusBadge: 'Vault Looted',
+        isPassed: true,
+      };
+    }
+    if (room.chest?.isFailed || room.chest?.isJammed) {
+      return {
+        title: `${room.title} — Vault Jammed`,
+        description: 'The reinforced iron locking mechanism was jammed solid during failed breach attempts. Abandoned.',
+        statusBadge: 'Vault Jammed',
         isPassed: true,
       };
     }
@@ -406,11 +414,19 @@ export function getRoomDisplayInfo(room: DungeonRoom): {
   }
 
   if (room.type === 'SECRET') {
-    if (isPassed) {
+    if (room.secret?.discovered || room.secret?.rewardClaimed) {
       return {
         title: `${room.title} — Secret Explored`,
         description: 'The hidden masonry compartment has been fully inspected and its cache collected.',
         statusBadge: 'Secret Looted',
+        isPassed: true,
+      };
+    }
+    if (room.secret?.isFailed) {
+      return {
+        title: `${room.title} — Secret Search Abandoned`,
+        description: 'The masonry walls and flagstones were thoroughly inspected, but no mechanisms were found. Abandoned.',
+        statusBadge: 'Search Abandoned',
         isPassed: true,
       };
     }

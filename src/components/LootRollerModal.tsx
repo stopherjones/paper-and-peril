@@ -14,6 +14,8 @@ import { DieShape } from './DieShape';
 
 interface LootRollerModalProps {
   isOpen: boolean;
+  hero?: HeroCharacter;
+  onUpdateHero?: (hero: HeroCharacter) => void;
   title: string;
   sourceDescription: string;
   floorNumber: number;
@@ -25,6 +27,8 @@ interface LootRollerModalProps {
 
 export const LootRollerModal: React.FC<LootRollerModalProps> = ({
   isOpen,
+  hero,
+  onUpdateHero,
   title,
   sourceDescription,
   floorNumber,
@@ -82,6 +86,13 @@ export const LootRollerModal: React.FC<LootRollerModalProps> = ({
       setHasRolled(true);
       sounds.playLoot();
     }, 600);
+  };
+
+  const handleUseFateReroll = () => {
+    if (!hero || hero.rerollTokens <= 0 || isRolling) return;
+    hero.rerollTokens -= 1;
+    onUpdateHero?.({ ...hero });
+    handleRollLootTable();
   };
 
   const handleConfirmClaim = () => {
@@ -224,14 +235,40 @@ export const LootRollerModal: React.FC<LootRollerModalProps> = ({
               </div>
             </div>
 
-            {/* Claim Button */}
-            <div className="flex justify-end pt-2">
+            {/* Actions: Fate Reroll & Claim */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              {hero && (
+                <button
+                  id="btn-loot-fate-reroll"
+                  disabled={hero.rerollTokens <= 0 || isRolling}
+                  onClick={handleUseFateReroll}
+                  className={`w-full sm:w-auto px-4 py-2.5 rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-2 border transition-all ${
+                    hero.rerollTokens > 0
+                      ? 'bg-purple-950/80 hover:bg-purple-900 border-purple-500/80 text-purple-200 shadow-md cursor-pointer active:scale-95'
+                      : 'bg-stone-900 border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                  }`}
+                  title={
+                    hero.rerollTokens > 0
+                      ? `Reroll 1d20 Loot Table (${hero.rerollTokens} Fate Tokens remaining)`
+                      : 'No Fate Tokens available in inventory'
+                  }
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  <span>
+                    {hero.rerollTokens > 0
+                      ? `✦ Fate Reroll Loot (${hero.rerollTokens} Available)`
+                      : '0 Fate Tokens Available'}
+                  </span>
+                </button>
+              )}
+
               <button
+                id="btn-confirm-loot-claim"
                 onClick={handleConfirmClaim}
-                className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 text-stone-950 font-bold rounded-lg shadow-xl flex items-center gap-2 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 text-stone-950 font-bold font-serif rounded-lg shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer transform hover:scale-105 active:scale-95 ml-auto"
               >
                 <Check className="w-4 h-4" />
-                Claim Loot & Add to Inventory
+                <span>Claim Loot & Add to Backpack ➔</span>
               </button>
             </div>
           </div>

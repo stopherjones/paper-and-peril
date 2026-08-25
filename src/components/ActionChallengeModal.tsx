@@ -54,6 +54,7 @@ interface ActionChallengeModalProps {
   isOpen: boolean;
   hero: HeroCharacter;
   config: ActionChallengeConfig | null;
+  onUpdateHero?: (hero: HeroCharacter) => void;
   onClose: () => void;
 }
 
@@ -61,6 +62,7 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
   isOpen,
   hero,
   config,
+  onUpdateHero,
   onClose,
 }) => {
   const [step, setStep] = useState<'PREPARE' | 'ROLLING' | 'RESOLVED'>('PREPARE');
@@ -95,6 +97,14 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
         sounds.playTrap();
       }
     }, 750);
+  };
+
+  const handleUseFateReroll = () => {
+    if (hero.rerollTokens <= 0) return;
+    hero.rerollTokens -= 1;
+    onUpdateHero?.({ ...hero });
+    sounds.playDiceRoll();
+    handleStartRoll();
   };
 
   const handleFinish = () => {
@@ -251,6 +261,43 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
                 </div>
               </div>
 
+              {/* Fate Reroll Option on Failure */}
+              {!isSuccess && (
+                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                      <span>Defy Fate & Alter Destiny</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-purple-300/90 font-serif">
+                    Spend 1 Fate Reroll from your inventory to immediately re-roll this {config.stat} check.
+                  </p>
+
+                  <button
+                    id="btn-use-fate-reroll-challenge"
+                    disabled={hero.rerollTokens <= 0}
+                    onClick={handleUseFateReroll}
+                    className={`w-full py-3 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                      hero.rerollTokens > 0
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <Dices className="w-4 h-4 text-purple-200" />
+                    <span>
+                      {hero.rerollTokens > 0
+                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available)`
+                        : 'No Fate Tokens Available in Inventory'}
+                    </span>
+                  </button>
+                </div>
+              )}
+
               {/* Acknowledge Button */}
               <button
                 id="btn-confirm-challenge-outcome"
@@ -258,10 +305,10 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
                 className={`w-full py-3.5 px-6 font-black font-serif text-base rounded-xl shadow-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 ${
                   isSuccess
                     ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 text-stone-950'
-                    : 'bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-600 text-stone-100'
+                    : 'bg-gradient-to-r from-stone-800 to-stone-900 hover:from-stone-700 hover:to-stone-800 text-stone-200 border border-stone-700'
                 }`}
               >
-                <span>Continue Quest ➔</span>
+                <span>{isSuccess ? 'Continue Quest ➔' : 'Accept Outcome & Proceed ➔'}</span>
               </button>
             </div>
           )}

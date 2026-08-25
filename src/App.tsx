@@ -43,10 +43,17 @@ import { RulebookModal } from './components/RulebookModal';
 import { HallOfFameModal } from './components/HallOfFameModal';
 import { JournalModal } from './components/JournalModal';
 import { TableInspectorModal } from './components/TableInspectorModal';
+import { CombatVictoryModal } from './components/CombatVictoryModal';
 import { generateDungeonFloor, isRoomPassedThrough, getRoomDisplayInfo } from './utils/generator';
 import { saveGameState, loadGameState, clearGameState } from './utils/storage';
 import { sounds } from './utils/audio';
 import { rollDice, getStatModifier } from './utils/dice';
+import {
+  addItemToHero,
+  consumeHeroRation,
+  consumeHeroTorch,
+  syncHeroSupplies,
+} from './utils/inventory';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>(() => {
@@ -77,6 +84,15 @@ export default function App() {
   const [showJournal, setShowJournal] = useState(false);
   const [showTableInspector, setShowTableInspector] = useState(false);
   const [pendingLevelUp, setPendingLevelUp] = useState(false);
+  const [combatVictoryReward, setCombatVictoryReward] = useState<{
+    monster: Monster;
+    reward: { xp: number; gold: number; items: GameItem[] };
+  } | null>(null);
+
+  // Active Map Action (triggered from Backpack or Map UI)
+  const [activeMapAction, setActiveMapAction] = useState<
+    'TORCH' | 'CLAIRVOYANCE' | 'SPYGLASS' | 'SMASH_WALL' | 'PHASE_WALL' | null
+  >(null);
 
   // Track previous room for fleeing
   const [previousRoomId, setPreviousRoomId] = useState<string>('');
@@ -149,8 +165,29 @@ export default function App() {
     const currentFloorObj = gameState.floors[gameState.currentFloor];
     if (!currentFloorObj || !currentFloorObj.rooms[targetRoomId]) return;
 
+    const currentRoom = currentFloorObj.rooms[gameState.currentRoomId];
+    if (currentRoom) {
+      // Prevent peeking through unbroken solid wall
+      const wall = (currentFloorObj.walls || []).find(
+        (w) =>
+          (w.roomA.x === currentRoom.gridX &&
+            w.roomA.y === currentRoom.gridY &&
+            w.roomB.x === currentFloorObj.rooms[targetRoomId].gridX &&
+            w.roomB.y === currentFloorObj.rooms[targetRoomId].gridY) ||
+          (w.roomA.x === currentFloorObj.rooms[targetRoomId].gridX &&
+            w.roomA.y === currentFloorObj.rooms[targetRoomId].gridY &&
+            w.roomB.x === currentRoom.gridX &&
+            w.roomB.y === currentRoom.gridY)
+      );
+      if (wall && !wall.isBroken) {
+        sounds.playBlock();
+        return;
+      }
+    }
+
     const targetRoom = { ...currentFloorObj.rooms[targetRoomId], isRevealed: true };
-    const hero = { ...gameState.hero, torches: gameState.hero.torches - 1 };
+    const hero = { ...gameState.hero };
+    consumeHeroTorch(hero);
 
     setGameState((prev) => ({
       ...prev,
@@ -165,6 +202,10 @@ export default function App() {
           },
         },
       },
+      historyLog: [
+        ...prev.historyLog,
+        `Lit Pitch Torch to illuminate Chamber [${targetRoom.gridX + 1}, ${targetRoom.gridY + 1}]!`,
+      ],
     }));
   };
 
@@ -180,6 +221,7 @@ export default function App() {
     } else {
       hero.inventory.splice(scrollIdx, 1);
     }
+    syncHeroSupplies(hero);
 
     const floorObj = gameState.floors[gameState.currentFloor];
     if (floorObj && floorObj.rooms[targetRoomId]) {
@@ -193,7 +235,47 @@ export default function App() {
         ...prev.floors,
         [prev.currentFloor]: { ...floorObj },
       },
+      historyLog: [
+        ...prev.historyLog,
+        `Cast Clairvoyance to reveal Chamber [${(floorObj?.rooms[targetRoomId]?.gridX ?? 0) + 1}, ${(floorObj?.rooms[targetRoomId]?.gridY ?? 0) + 1}]!`,
+      ],
     }));
+  };
+
+  // Use Burglar's Spyglass to peek an adjacent room without consuming a torch
+  const handleUseSpyglass = (targetRoomId: string) => {
+    if (!gameState.hero) return;
+    const currentFloorObj = gameState.floors[gameState.currentFloor];
+    if (!currentFloorObj || !currentFloorObj.rooms[targetRoomId]) return;
+
+    const targetRoom = { ...currentFloorObj.rooms[targetRoomId], isRevealed: true };
+
+    setGameState((prev) => ({
+      ...prev,
+      floors: {
+        ...prev.floors,
+        [prev.currentFloor]: {
+          ...currentFloorObj,
+          rooms: {
+            ...currentFloorObj.rooms,
+            [targetRoomId]: targetRoom,
+          },
+        },
+      },
+      historyLog: [
+        ...prev.historyLog,
+        `Used Burglar's Spyglass to scout Chamber [${targetRoom.gridX + 1}, ${targetRoom.gridY + 1}]!`,
+      ],
+    }));
+  };
+
+  // Open Map and activate corresponding action from Backpack
+  const handleActivateMapAction = (
+    action: 'TORCH' | 'CLAIRVOYANCE' | 'SPYGLASS' | 'SMASH_WALL' | 'PHASE_WALL'
+  ) => {
+    setShowInventory(false);
+    setShowRoomModal(false);
+    setActiveMapAction(action);
   };
 
   // Smash an interior stone wall with sledgehammer or pickaxe
@@ -282,9 +364,12 @@ export default function App() {
         sounds.playBlock();
         return;
       }
-      if (currentRoom.trap && !currentRoom.trap.disarmed && !currentRoom.trap.triggered) {
-        sounds.playTrap();
-        return;
+      if (currentRoom.trap && !currentRoom.trap.disarmed) {
+        // Traps remain active until disarmed. Player can retreat back the way they came, but cannot progress forward to new rooms.
+        if (previousRoomId && targetRoomId !== previousRoomId) {
+          sounds.playTrap();
+          return;
+        }
       }
     }
 
@@ -372,15 +457,14 @@ export default function App() {
   const handleEatRation = () => {
     if (!gameState.hero || gameState.hero.rations <= 0) return;
     sounds.playHeal();
-    const updatedHero = {
-      ...gameState.hero,
-      rations: gameState.hero.rations - 1,
-      currentHp: Math.min(gameState.hero.maxHp, gameState.hero.currentHp + 10),
-    };
+    const updatedHero = { ...gameState.hero };
+    consumeHeroRation(updatedHero);
+    updatedHero.currentHp = Math.min(updatedHero.maxHp, updatedHero.currentHp + 10);
+
     setGameState((prev) => ({
       ...prev,
       hero: updatedHero,
-      historyLog: [`Ate salted dungeon rations. Restored 10 HP.`, ...prev.historyLog],
+      historyLog: [`Ate salted dungeon rations from backpack. Restored 10 HP.`, ...prev.historyLog],
     }));
   };
 
@@ -447,14 +531,38 @@ export default function App() {
       }
     }
 
+    // Exit combat mode and present the Combat Victory Loot Pop-Up!
+    setGameState((prev) => ({
+      ...prev,
+      phase: 'EXPLORATION',
+      combat: null,
+      floors: {
+        ...prev.floors,
+        [prev.currentFloor]: { ...currentFloorObj },
+      },
+    }));
+
+    setCombatVictoryReward({
+      monster,
+      reward,
+    });
+  };
+
+  const handleClaimCombatVictoryLoot = () => {
+    if (!combatVictoryReward || !gameState.hero) return;
+    const { monster, reward } = combatVictoryReward;
+
     const updatedHero = { ...gameState.hero };
     updatedHero.xp += reward.xp;
     updatedHero.gold += reward.gold;
     updatedHero.statsHistory.goldCollected += reward.gold;
 
     reward.items.forEach((item) => {
-      updatedHero.inventory.push({ item, quantity: 1 });
+      addItemToHero(updatedHero, item, 1);
     });
+    syncHeroSupplies(updatedHero);
+
+    setCombatVictoryReward(null);
 
     // Check if this was the Dragon boss on Floor 3 (Final Victory!)
     if (monster.id === 'crimson_dragon') {
@@ -470,12 +578,6 @@ export default function App() {
     setGameState((prev) => ({
       ...prev,
       hero: updatedHero,
-      phase: 'EXPLORATION',
-      combat: null,
-      floors: {
-        ...prev.floors,
-        [prev.currentFloor]: { ...currentFloorObj },
-      },
     }));
   };
 
@@ -534,7 +636,16 @@ export default function App() {
     hero.maxMana += 6;
     hero.currentMana = hero.maxMana;
     hero.stats[chosenStat] += 2;
-    hero.rerollTokens += 1;
+    
+    // Add Fate Die to inventory & sync
+    addItemToHero(hero, {
+      id: 'dice_of_fate',
+      name: 'Dice of Fate',
+      type: 'relic',
+      value: 25,
+      description: 'A glowing polyhedral die imbued with destiny. Allows rerolling any failed d20 attribute test or combat strike.',
+    }, 1);
+    syncHeroSupplies(hero);
 
     setPendingLevelUp(false);
     setGameState((prev) => ({ ...prev, hero }));
@@ -671,11 +782,14 @@ export default function App() {
                 floor={currentFloorObj}
                 currentRoomId={gameState.currentRoomId}
                 hero={gameState.hero}
+                activeMapAction={activeMapAction}
+                onClearMapAction={() => setActiveMapAction(null)}
                 onSelectAdjacentRoom={handleNavigateToRoom}
                 onSmashWall={handleSmashWall}
                 onPhaseThroughWall={handlePhaseThroughWall}
                 onUseTorch={handleUseTorch}
                 onUseClairvoyance={handleUseClairvoyance}
+                onUseSpyglass={handleUseSpyglass}
                 onOpenCurrentRoom={() => setShowRoomModal(true)}
                 onDescendFloor={handleDescendFloor}
               />
@@ -771,6 +885,7 @@ export default function App() {
           room={currentRoom}
           hero={gameState.hero}
           combat={gameState.combat}
+          previousRoomId={previousRoomId}
           onUpdateHero={(updatedHero) =>
             setGameState((prev) => ({ ...prev, hero: updatedHero }))
           }
@@ -808,6 +923,7 @@ export default function App() {
           hero={gameState.hero}
           onUpdateHero={(updatedHero) => setGameState((prev) => ({ ...prev, hero: updatedHero }))}
           onClose={() => setShowInventory(false)}
+          onActivateMapAction={handleActivateMapAction}
         />
       )}
 
@@ -841,6 +957,16 @@ export default function App() {
 
       {pendingLevelUp && gameState.hero && (
         <LevelUpModal hero={gameState.hero} onConfirmLevelUp={handleConfirmLevelUp} />
+      )}
+
+      {combatVictoryReward && gameState.hero && (
+        <CombatVictoryModal
+          isOpen={true}
+          monster={combatVictoryReward.monster}
+          reward={combatVictoryReward.reward}
+          hero={gameState.hero}
+          onClaim={handleClaimCombatVictoryLoot}
+        />
       )}
 
       {(gameState.phase === 'GAME_OVER' || gameState.phase === 'VICTORY') && gameState.hero && (

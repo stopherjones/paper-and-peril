@@ -9,6 +9,7 @@ import { GameItem, HeroCharacter } from '../types/game';
 import { generateMerchantStock } from '../utils/generator';
 import { MERCHANT_QUOTES } from '../data/events';
 import { sounds } from '../utils/audio';
+import { addItemToHero, syncHeroSupplies } from '../utils/inventory';
 
 interface MerchantModalProps {
   hero: HeroCharacter;
@@ -38,8 +39,11 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
       return;
     }
 
-    if (hero.inventory.length >= hero.maxInventorySlots) {
-      setFeedback('“Your backpack is stuffed to the brim! Make some room first.”');
+    const isStackable = ['potion', 'scroll', 'tool', 'treasure'].includes(item.type);
+    const existing = isStackable ? hero.inventory.find((inv) => inv.item.id === item.id) : null;
+
+    if (!existing && hero.inventory.length >= hero.maxInventorySlots) {
+      setFeedback(`“Your backpack is stuffed to the brim! (${hero.inventory.length}/${hero.maxInventorySlots} slots used). Make room first.”`);
       sounds.playBlock();
       return;
     }
@@ -47,14 +51,16 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
     sounds.playCoins();
     hero.gold -= item.value;
 
-    const existing = hero.inventory.find((inv) => inv.item.id === item.id);
-    if (existing && item.type === 'potion') {
-      existing.quantity += 1;
-    } else {
-      hero.inventory.push({ item, quantity: 1 });
+    const res = addItemToHero(hero, item, 1);
+    if (!res.success) {
+      // Refund if adding failed
+      hero.gold += item.value;
+      setFeedback(`“${res.message}”`);
+      sounds.playBlock();
+      return;
     }
 
-    setFeedback(`“A fine choice! The ${item.name} is yours.”`);
+    setFeedback(`“A fine choice! The ${item.name} has been stowed in your pack.”`);
     onUpdateHero({ ...hero });
   };
 
@@ -73,6 +79,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
       hero.inventory.splice(inventoryIdx, 1);
     }
 
+    syncHeroSupplies(hero);
     setFeedback(`“Pleasure doing business! +${sellPrice} Gold paid for ${invItem.item.name}.”`);
     onUpdateHero({ ...hero });
   };

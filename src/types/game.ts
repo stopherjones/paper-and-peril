@@ -225,6 +225,8 @@ export interface DungeonRoom {
     isOpened: boolean;
     gold: number;
     items: GameItem[];
+    isFailed?: boolean;
+    isJammed?: boolean;
   };
   trap?: {
     id: string;
@@ -248,6 +250,7 @@ export interface DungeonRoom {
     difficulty: number;
     rewardDescription: string;
     rewardClaimed: boolean;
+    isFailed?: boolean;
   };
 }
 

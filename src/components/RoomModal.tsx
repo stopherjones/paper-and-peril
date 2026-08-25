@@ -44,6 +44,7 @@ interface RoomModalProps {
   room: DungeonRoom;
   hero: HeroCharacter;
   combat: CombatState | null;
+  previousRoomId?: string;
   onUpdateHero: (hero: HeroCharacter) => void;
   onUpdateRoom: (room: DungeonRoom) => void;
   onEnterCombat: (room: DungeonRoom) => void;
@@ -65,6 +66,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
   room,
   hero,
   combat,
+  previousRoomId,
   onUpdateHero,
   onUpdateRoom,
   onEnterCombat,
@@ -236,6 +238,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
               floor={floor}
               room={room}
               hero={hero}
+              previousRoomId={previousRoomId}
               onUpdateHero={onUpdateHero}
               onUpdateRoom={onUpdateRoom}
               onEnterCombat={onEnterCombat}

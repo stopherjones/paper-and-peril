@@ -248,28 +248,94 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
         </div>
       </div>
 
-      {/* Consumables Belt */}
-      <div className="grid grid-cols-5 gap-1 pt-2 border-t border-[#44301d] text-center">
-        <div className="bg-[#150e09] p-1 rounded border border-[#382618]" title="Gold Coins">
-          <Coins className="w-3 h-3 text-yellow-400 mx-auto mb-0.5" />
-          <span className="text-[11px] font-mono font-bold text-yellow-200">{hero.gold}</span>
+      {/* Wealth & Coin Purse */}
+      <div className="flex items-center justify-between bg-[#171008] px-2.5 py-1.5 rounded-lg border border-amber-600/60 mb-2.5 shadow-inner">
+        <div className="flex items-center gap-1.5">
+          <Coins className="w-4 h-4 text-yellow-400" />
+          <span className="text-[11px] font-serif text-amber-200/90 uppercase font-bold">Purse & Wealth:</span>
         </div>
-        <div className="bg-[#150e09] p-1 rounded border border-[#382618]" title="Fate Dice (Reroll Tokens)">
-          <Dices className="w-3 h-3 text-purple-400 mx-auto mb-0.5" />
-          <span className="text-[11px] font-mono font-bold text-purple-200">{hero.rerollTokens}</span>
+        <span className="text-xs font-mono font-bold text-yellow-300">{hero.gold} Gold Pieces (GP)</span>
+      </div>
+
+      {/* Backpack Storage & Physical Items */}
+      <div className="border-t border-[#44301d] pt-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px] font-mono text-amber-300 font-bold uppercase tracking-wider">
+              Backpack Storage
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-stone-300 font-bold">
+            {hero.inventory.length} / {hero.maxInventorySlots} Slots
+          </span>
         </div>
-        <div className="bg-[#150e09] p-1 rounded border border-[#382618]" title="Dungeon Rations">
-          <Utensils className="w-3 h-3 text-amber-500 mx-auto mb-0.5" />
-          <span className="text-[11px] font-mono font-bold text-amber-200">{hero.rations}</span>
+
+        {/* Backpack Capacity Bar */}
+        <div className="w-full h-1.5 bg-[#140e0a] rounded-full overflow-hidden border border-[#382618] mb-2">
+          <div
+            className={`h-full transition-all duration-300 ${
+              hero.inventory.length >= hero.maxInventorySlots
+                ? 'bg-red-500'
+                : hero.inventory.length >= hero.maxInventorySlots - 2
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-600'
+            }`}
+            style={{ width: `${Math.min(100, (hero.inventory.length / hero.maxInventorySlots) * 100)}%` }}
+          />
         </div>
-        <div className="bg-[#150e09] p-1 rounded border border-[#382618]" title="Torches">
-          <Flame className="w-3 h-3 text-orange-400 mx-auto mb-0.5" />
-          <span className="text-[11px] font-mono font-bold text-orange-200">{hero.torches}</span>
+
+        {/* Backpack Items List Preview */}
+        <div className="grid grid-cols-2 gap-1 mb-2 max-h-36 overflow-y-auto pr-0.5">
+          {hero.inventory.map((inv, idx) => (
+            <div
+              key={idx}
+              className="bg-[#181109] border border-[#3b2716] hover:border-[#634529] p-1.5 rounded flex items-center justify-between text-[10px] text-stone-300 transition-colors"
+              title={`${inv.item.name} (${inv.item.type})`}
+            >
+              <div className="flex items-center gap-1.5 truncate mr-1">
+                {inv.item.id === 'dungeon_ration' ? (
+                  <Utensils className="w-3 h-3 text-amber-500 shrink-0" />
+                ) : inv.item.id === 'iron_lockpick' ? (
+                  <Key className="w-3 h-3 text-cyan-400 shrink-0" />
+                ) : inv.item.id === 'dungeon_torch' ? (
+                  <Flame className="w-3 h-3 text-orange-400 shrink-0" />
+                ) : inv.item.id === 'dice_of_fate' ? (
+                  <Dices className="w-3 h-3 text-purple-400 shrink-0" />
+                ) : inv.item.type === 'potion' ? (
+                  <Heart className="w-3 h-3 text-red-400 shrink-0" />
+                ) : inv.item.type === 'scroll' ? (
+                  <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
+                ) : inv.item.type === 'weapon' ? (
+                  <Sword className="w-3 h-3 text-red-300 shrink-0" />
+                ) : (
+                  <Shield className="w-3 h-3 text-blue-300 shrink-0" />
+                )}
+                <span className="font-serif truncate font-bold text-amber-100/90">{inv.item.name}</span>
+              </div>
+              {inv.quantity > 1 && (
+                <span className="text-[9px] font-mono text-amber-400 font-bold bg-[#291a0f] px-1 py-0.2 rounded border border-[#4a2e19] shrink-0">
+                  x{inv.quantity}
+                </span>
+              )}
+            </div>
+          ))}
+
+          {hero.inventory.length === 0 && (
+            <div className="col-span-2 text-center py-2 text-stone-500 font-serif text-[11px]">
+              Backpack empty
+            </div>
+          )}
         </div>
-        <div className="bg-[#150e09] p-1 rounded border border-[#382618]" title="Lockpicks">
-          <Key className="w-3 h-3 text-cyan-400 mx-auto mb-0.5" />
-          <span className="text-[11px] font-mono font-bold text-cyan-200">{hero.lockpicks}</span>
-        </div>
+
+        <button
+          id="btn-manage-backpack"
+          onClick={onOpenInventory}
+          className="w-full py-1.5 bg-[#3a2818] hover:bg-[#4f3621] text-amber-200 border border-[#6b4b2c] rounded text-xs font-serif font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+        >
+          <Package className="w-3.5 h-3.5 text-amber-400" />
+          <span>Manage Backpack & Equip Gear</span>
+        </button>
       </div>
     </div>
   );

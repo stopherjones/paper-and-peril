@@ -524,6 +524,279 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }, 650);
   };
 
+  // FATE REROLL HANDLERS
+  const handleFateRerollHeroAttack = () => {
+    if (hero.rerollTokens <= 0 || !pendingAttack) return;
+    hero.rerollTokens -= 1;
+    onUpdateHero({ ...hero });
+    sounds.playDiceRoll();
+
+    setCombatStep('HERO_ATTACK_ROLLING');
+
+    if (pendingAttack.type === 'spell') {
+      const spellAtkMod = intMod;
+      const spellRoll = rollDice(1, 20, spellAtkMod);
+      setCurrentRoll(spellRoll);
+
+      setTimeout(() => {
+        const isHit = spellRoll.isCrit || (!spellRoll.isFumble && spellRoll.total >= monster.armorClass);
+        setPendingAttack({
+          ...pendingAttack,
+          atkRoll: spellRoll,
+          isHit,
+          isCrit: spellRoll.isCrit,
+          isFumble: spellRoll.isFumble,
+        });
+
+        if (!isHit) {
+          sounds.playBlock();
+          setActionSummary({
+            title: `${pendingAttack.name} Fizzled (Fate Reroll)`,
+            details: `Fate Reroll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (INT) = ${spellRoll.total} vs AC ${monster.armorClass}. Deflected by monster wards!`,
+            isHit: false,
+            type: 'hero',
+          });
+          addLog('hero', `${pendingAttack.name} (Fate Reroll Fizzle)`, `Spell failed to penetrate AC ${monster.armorClass}.`);
+        } else {
+          sounds.playFire();
+          setActionSummary({
+            title: spellRoll.isCrit ? `CRITICAL ${pendingAttack.name.toUpperCase()} (FATE REROLL)!` : `${pendingAttack.name} Connected (Fate Reroll)!`,
+            details: `Fate Reroll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (INT) = ${spellRoll.total} vs AC ${monster.armorClass}. Spell penetrated wards! Proceed to roll damage dice.`,
+            isHit: true,
+            isCrit: spellRoll.isCrit,
+            type: 'hero',
+          });
+        }
+        setCombatStep('HERO_ATTACK_RESULT');
+      }, 600);
+    } else {
+      const atkRoll = rollDice(1, 20, totalWeaponAtkMod);
+      setCurrentRoll(atkRoll);
+
+      setTimeout(() => {
+        const isHit = atkRoll.isCrit || (!atkRoll.isFumble && atkRoll.total >= monster.armorClass);
+        setPendingAttack({
+          ...pendingAttack,
+          atkRoll,
+          isHit,
+          isCrit: atkRoll.isCrit,
+          isFumble: atkRoll.isFumble,
+        });
+
+        if (!isHit) {
+          sounds.playBlock();
+          setActionSummary({
+            title: atkRoll.isFumble ? 'CRITICAL FUMBLE (FATE REROLL)!' : 'ATTACK MISSED (FATE REROLL)',
+            details: `Fate Reroll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (STR + Weapon) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. The blow failed to penetrate!`,
+            isHit: false,
+            isFumble: atkRoll.isFumble,
+            type: 'hero',
+          });
+          addLog(
+            'hero',
+            `Fate Reroll Attack (Miss)`,
+            `Rolled [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${monster.armorClass}. Missed!`,
+            {
+              diceType: 'd20',
+              rolls: atkRoll.individualRolls,
+              modifier: atkRoll.modifier,
+              total: atkRoll.total,
+              targetValue: monster.armorClass,
+              isFumble: atkRoll.isFumble,
+            }
+          );
+        } else {
+          sounds.playHit();
+          setActionSummary({
+            title: atkRoll.isCrit ? 'CRITICAL HIT (FATE REROLL)!' : 'ATTACK HIT (FATE REROLL)!',
+            details: `Fate Reroll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (STR + Weapon) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. Strike connected! Proceed to roll damage dice.`,
+            isHit: true,
+            isCrit: atkRoll.isCrit,
+            type: 'hero',
+          });
+        }
+        setCombatStep('HERO_ATTACK_RESULT');
+      }, 600);
+    }
+  };
+
+  const handleFateRerollHeroDamage = () => {
+    if (hero.rerollTokens <= 0 || !pendingAttack || !actionSummary) return;
+    if (actionSummary.damage) {
+      monster.hp = Math.min(monster.maxHp, monster.hp + actionSummary.damage);
+    }
+    hero.rerollTokens -= 1;
+    onUpdateHero({ ...hero });
+    sounds.playDiceRoll();
+
+    setCombatStep('HERO_DAMAGE_ROLLING');
+
+    setTimeout(() => {
+      const dmgRes = parseAndRollFormula(pendingAttack.damageFormula, heroStats, pendingAttack.damageBonus);
+      let dmg = dmgRes.total;
+
+      if (pendingAttack.isCrit) {
+        dmg = dmg * 2 + 3;
+        sounds.playCriticalHit();
+      } else {
+        if (pendingAttack.type === 'spell') sounds.playFire();
+        else sounds.playHit();
+      }
+
+      hero.statsHistory.highestDamageDealt = Math.max(hero.statsHistory.highestDamageDealt, dmg);
+      const newMonsterHp = Math.max(0, monster.hp - dmg);
+      monster.hp = newMonsterHp;
+      setDamageRoll(dmgRes);
+
+      setActionSummary({
+        title: pendingAttack.isCrit ? 'CRITICAL HIT & DAMAGE (FATE REROLL)!' : 'DAMAGE DEALT (FATE REROLL)!',
+        details: `Fate Reroll Damage Dice: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} = ${dmg} damage dealt to ${monster.name}.`,
+        damage: dmg,
+        isHit: true,
+        isCrit: pendingAttack.isCrit,
+        type: 'hero',
+      });
+
+      addLog(
+        'hero',
+        `Fate Reroll Damage on ${pendingAttack.name}`,
+        `New damage rolled: ${dmg} (${dmgRes.formulaString}).`,
+        undefined,
+        dmg
+      );
+
+      onUpdateHero({ ...hero });
+      onUpdateCombat({ ...combat });
+      setCombatStep('HERO_DAMAGE_RESULT');
+    }, 600);
+  };
+
+  const handleFateRerollFlee = () => {
+    if (hero.rerollTokens <= 0) return;
+    hero.rerollTokens -= 1;
+    onUpdateHero({ ...hero });
+    sounds.playDiceRoll();
+
+    setCombatStep('HERO_ATTACK_ROLLING');
+
+    const escapeDc = 10 + monster.level;
+    const fleeRoll = rollDice(1, 20, fleeMod);
+    setCurrentRoll(fleeRoll);
+
+    setTimeout(() => {
+      if (fleeRoll.total >= escapeDc) {
+        sounds.playLoot();
+        setActionSummary({
+          title: '✦ ESCAPED THE ENCOUNTER (FATE REROLL)!',
+          details: `Fate Reroll Flee Check: Rolled [${fleeRoll.individualRolls[0]}] ${fleeRoll.modifier >= 0 ? `+ ${fleeRoll.modifier}` : fleeRoll.modifier} = ${fleeRoll.total} vs Escape DC ${escapeDc}. You retreated safely to the previous chamber!`,
+          type: 'flee',
+          isHit: true,
+        });
+        addLog('hero', 'Escaped (Fate Reroll)', `Fled combat successfully (DC ${escapeDc}).`);
+        setCombatStep('FLEE_RESULT');
+      } else {
+        sounds.playTrap();
+        setActionSummary({
+          title: '✖ FLEE FAILED (FATE REROLL)!',
+          details: `Fate Reroll Flee Check: Rolled [${fleeRoll.individualRolls[0]}] ${fleeRoll.modifier >= 0 ? `+ ${fleeRoll.modifier}` : fleeRoll.modifier} = ${fleeRoll.total} vs Escape DC ${escapeDc}. ${monster.name} blocks your escape!`,
+          type: 'flee',
+          isHit: false,
+        });
+        addLog('hero', 'Flee Failed (Fate Reroll)', `Failed to escape DC ${escapeDc}.`);
+        setCombatStep('HERO_NON_DAMAGE_RESULT');
+      }
+    }, 600);
+  };
+
+  const handleFateDodgeMonster = () => {
+    if (hero.rerollTokens <= 0 || !actionSummary) return;
+    if (actionSummary.damage) {
+      hero.currentHp = Math.min(hero.maxHp, hero.currentHp + actionSummary.damage);
+    }
+    hero.rerollTokens -= 1;
+    onUpdateHero({ ...hero });
+    sounds.playDiceRoll();
+
+    setCombatStep('ENEMY_ROLLING');
+
+    const actions = monster.actions;
+    const action = actions[Math.floor(Math.random() * actions.length)] || actions[0];
+
+    const atkRoll = rollDice(1, 20, monster.attackBonus);
+    setCurrentRoll(atkRoll);
+
+    setTimeout(() => {
+      const isHit = atkRoll.isCrit || (!atkRoll.isFumble && atkRoll.total >= heroAc);
+
+      if (isHit) {
+        const dmgRes = parseAndRollFormula(action.diceFormula);
+        let dmg = dmgRes.total;
+
+        if (atkRoll.isCrit) {
+          dmg = dmg * 2;
+          sounds.playCriticalHit();
+        } else {
+          sounds.playHit();
+        }
+
+        if (combat.heroDefending) {
+          dmg = Math.max(1, dmg - 3);
+        }
+
+        hero.currentHp = Math.max(0, hero.currentHp - dmg);
+
+        setActionSummary({
+          title: atkRoll.isCrit ? `CRITICAL ${action.name.toUpperCase()}!` : `${action.name} Landed!`,
+          details: `${action.name} (Forced Reroll): Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. Struck you for ${dmg} damage!`,
+          damage: dmg,
+          isHit: true,
+          isCrit: atkRoll.isCrit,
+          type: 'monster',
+        });
+
+        addLog(
+          'monster',
+          `${monster.name} Hit (After Fate Dodge)`,
+          `Attack roll: ${atkRoll.total} vs your AC ${heroAc}. Dealt ${dmg} damage.`,
+          {
+            diceType: 'd20',
+            rolls: atkRoll.individualRolls,
+            modifier: atkRoll.modifier,
+            total: atkRoll.total,
+            targetValue: heroAc,
+            isCrit: atkRoll.isCrit,
+          },
+          dmg
+        );
+      } else {
+        sounds.playBlock();
+        setActionSummary({
+          title: '✦ FATE DEFLECTION SUCCESSFUL!',
+          details: `Fate Dodge: ${monster.name} re-rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. The blow was completely deflected by fate!`,
+          isHit: false,
+          type: 'monster',
+        });
+
+        addLog(
+          'monster',
+          `${monster.name} Missed (Fate Dodge)`,
+          `Reroll: ${atkRoll.total} vs your AC ${heroAc}. Deflected with Fate!`,
+          {
+            diceType: 'd20',
+            rolls: atkRoll.individualRolls,
+            modifier: atkRoll.modifier,
+            total: atkRoll.total,
+            targetValue: heroAc,
+          }
+        );
+      }
+
+      onUpdateHero({ ...hero });
+      onUpdateCombat({ ...combat });
+      setCombatStep('ENEMY_RESULT');
+    }, 650);
+  };
+
   // 8. BEGIN NEXT ROUND (Player Turn)
   const handleBeginNextHeroRound = () => {
     setCurrentRoll(null);
@@ -952,6 +1225,43 @@ export const CombatView: React.FC<CombatViewProps> = ({
                 </div>
               </div>
 
+              {/* Fate Reroll on Failed Attack */}
+              {!pendingAttack.isHit && (
+                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                      <span>Defy Fate & Alter Destiny</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-purple-300/90 font-serif">
+                    Spend 1 Fate Reroll from your inventory to immediately re-roll this attack check.
+                  </p>
+
+                  <button
+                    id="btn-use-fate-reroll-attack"
+                    disabled={hero.rerollTokens <= 0}
+                    onClick={handleFateRerollHeroAttack}
+                    className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                      hero.rerollTokens > 0
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <Dices className="w-4 h-4 text-purple-200" />
+                    <span>
+                      {hero.rerollTokens > 0
+                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available)`
+                        : 'No Fate Tokens in Inventory'}
+                    </span>
+                  </button>
+                </div>
+              )}
+
               {/* Progress Action Controls */}
               <div className="flex justify-end pt-2">
                 {pendingAttack.isHit ? (
@@ -1018,30 +1328,55 @@ export const CombatView: React.FC<CombatViewProps> = ({
               </div>
 
               {/* Progress Controls */}
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                {monster.hp > 0 && (
+                  <button
+                    id="btn-fate-reroll-damage"
+                    disabled={hero.rerollTokens <= 0}
+                    onClick={handleFateRerollHeroDamage}
+                    className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-serif font-bold flex items-center justify-center gap-2 border shadow-md transition-all ${
+                      hero.rerollTokens > 0
+                        ? 'bg-purple-950/80 hover:bg-purple-900 border-purple-500/80 text-purple-200 cursor-pointer active:scale-95'
+                        : 'bg-stone-900/80 border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                    }`}
+                    title={
+                      hero.rerollTokens > 0
+                        ? `Reroll damage dice (${hero.rerollTokens} Fate Tokens remaining)`
+                        : 'No Fate Tokens available in inventory'
+                    }
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    <span>
+                      {hero.rerollTokens > 0
+                        ? `✦ Fate Reroll Damage (${hero.rerollTokens} Available)`
+                        : '0 Fate Tokens Available'}
+                    </span>
+                  </button>
+                )}
+
                 {monster.hp <= 0 ? (
                   <button
                     id="btn-victory-claim-spoils"
                     onClick={handleMonsterSlain}
-                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 text-stone-950 font-black font-serif rounded-xl shadow-xl flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
+                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 text-stone-950 font-black font-serif rounded-xl shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer transform hover:scale-105 ml-auto"
                   >
                     <Award className="w-5 h-5" />
-                    Victory! Claim Spoils & XP ➔
+                    <span>Victory! Claim Spoils & XP ➔</span>
                   </button>
                 ) : (
                   <button
                     id="btn-continue-after-damage"
                     onClick={handleProceedToEnemyTurn}
-                    className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 text-stone-100 font-black font-serif rounded-xl shadow-xl flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
+                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 text-stone-100 font-black font-serif rounded-xl shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer transform hover:scale-105 ml-auto"
                   >
-                    Continue to Enemy Turn ➔
+                    <span>Continue to Enemy Turn ➔</span>
                   </button>
                 )}
               </div>
             </div>
           )}
 
-          {/* Non-Damage Hero Action Result (e.g. Heal, Buff, Item) */}
+          {/* Non-Damage Hero Action Result (e.g. Heal, Buff, Item, Flee Fail) */}
           {combatStep === 'HERO_NON_DAMAGE_RESULT' && actionSummary && (
             <div className="bg-[#18120c]/95 border-2 border-amber-500 rounded-xl p-6 shadow-2xl space-y-4 animate-fadeIn">
               <div className="flex items-center justify-between border-b border-amber-900/60 pb-3">
@@ -1058,6 +1393,43 @@ export const CombatView: React.FC<CombatViewProps> = ({
               <div className="p-4 bg-stone-900/80 rounded-lg border border-amber-900/60 text-sm text-stone-200 leading-relaxed font-serif">
                 {actionSummary.details}
               </div>
+
+              {/* Fate Reroll on Failed Flee */}
+              {actionSummary.type === 'flee' && !actionSummary.isHit && (
+                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                      <span>Defy Fate & Alter Destiny</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-purple-300/90 font-serif">
+                    Spend 1 Fate Reroll to re-attempt your escape roll immediately before the enemy attacks!
+                  </p>
+
+                  <button
+                    id="btn-fate-reroll-flee"
+                    disabled={hero.rerollTokens <= 0}
+                    onClick={handleFateRerollFlee}
+                    className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                      hero.rerollTokens > 0
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <Dices className="w-4 h-4 text-purple-200" />
+                    <span>
+                      {hero.rerollTokens > 0
+                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available) - Reroll Escape`
+                        : 'No Fate Tokens in Inventory'}
+                    </span>
+                  </button>
+                </div>
+              )}
 
               <div className="flex justify-end pt-2">
                 <button
@@ -1086,7 +1458,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
             </div>
           )}
 
-          {/* STEP 6: Enemy Result Card with Explicit "Begin Round" Button */}
+          {/* STEP 6: Enemy Result Card with Fate Dodge and Explicit "Begin Round" Button */}
           {combatStep === 'ENEMY_RESULT' && actionSummary && (
             <div className="bg-[#18120c]/95 border-2 border-red-600 rounded-xl p-6 shadow-2xl space-y-4 animate-fadeIn">
               <div className="flex items-center justify-between border-b border-red-950 pb-3">
@@ -1114,6 +1486,43 @@ export const CombatView: React.FC<CombatViewProps> = ({
               <div className="p-4 bg-stone-900/80 rounded-lg border border-red-900/60 text-sm text-stone-200 leading-relaxed font-serif">
                 {actionSummary.details}
               </div>
+
+              {/* Fate Dodge Opportunity when Monster lands a Hit on Hero */}
+              {actionSummary.type === 'monster' && actionSummary.isHit && (
+                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                      <span>Fate Dodge: Force Enemy Reroll</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-purple-300/90 font-serif">
+                    Spend 1 Fate Reroll to rewind the strike, restore the damage taken, and force {monster.name} to re-roll their attack against your AC {heroAc}!
+                  </p>
+
+                  <button
+                    id="btn-fate-dodge-monster"
+                    disabled={hero.rerollTokens <= 0}
+                    onClick={handleFateDodgeMonster}
+                    className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                      hero.rerollTokens > 0
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4 text-purple-200" />
+                    <span>
+                      {hero.rerollTokens > 0
+                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available) - Fate Dodge`
+                        : 'No Fate Tokens in Inventory'}
+                    </span>
+                  </button>
+                </div>
+              )}
 
               {/* Progress Controls */}
               <div className="flex justify-end pt-2">

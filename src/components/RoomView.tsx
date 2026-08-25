@@ -15,6 +15,7 @@ import {
   Footprints,
   Key,
   Shield,
+  ShieldAlert,
   Dices,
   Flame,
   Sparkles,
@@ -35,6 +36,7 @@ interface RoomViewProps {
   floor: DungeonFloor;
   room: DungeonRoom;
   hero: HeroCharacter;
+  previousRoomId?: string;
   onUpdateHero: (hero: HeroCharacter) => void;
   onUpdateRoom: (room: DungeonRoom) => void;
   onEnterCombat: (room: DungeonRoom) => void;
@@ -51,6 +53,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   floor,
   room,
   hero,
+  previousRoomId,
   onUpdateHero,
   onUpdateRoom,
   onEnterCombat,
@@ -94,7 +97,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   // Chest: Pick Lock (DEX) via Focused Modal
   const handlePickChestLock = () => {
-    if (!room.chest || room.chest.isOpened) return;
+    if (!room.chest || room.chest.isOpened || room.chest.isFailed || room.chest.isJammed) return;
 
     let bonus = getStatModifier(heroStats.DEX);
     const hasPicks = hero.lockpicks > 0;
@@ -119,7 +122,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       successOutcomeTitle: 'Tumbler Unlocked!',
       successOutcomeDesc: `With a satisfying mechanical click, the iron chest springs open! Ready to collect your spoils.`,
       failureOutcomeTitle: 'Lockpick Slipped',
-      failureOutcomeDesc: `The stubborn pins refused to catch. The chest remains securely locked.`,
+      failureOutcomeDesc: `The stubborn pins seized up and jammed tight. The breach attempt has been abandoned.`,
       onSuccess: () => {
         if (room.chest) {
           room.chest.isLocked = false;
@@ -132,7 +135,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onUpdateRoom({ ...room });
       },
       onFailure: () => {
-        setEventMessage(`✖ Lockpick slipped! The iron chest remains locked.`);
+        if (room.chest) {
+          room.chest.isFailed = true;
+          room.chest.isJammed = true;
+        }
+        setEventMessage(`✖ Lockpick slipped & mechanism jammed! The chest cannot be opened.`);
+        onUpdateRoom({ ...room });
       },
     });
     setShowChallengeModal(true);
@@ -140,7 +148,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   // Chest: Force Open (STR) via Focused Modal
   const handleForceChest = () => {
-    if (!room.chest || room.chest.isOpened) return;
+    if (!room.chest || room.chest.isOpened || room.chest.isFailed || room.chest.isJammed) return;
 
     const bonus = getStatModifier(heroStats.STR);
     const dc = room.chest.lockDifficulty + 2;
@@ -158,9 +166,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
       successOutcomeTitle: 'Iron Latch Splintered!',
       successOutcomeDesc:
         'Your strike shatters the locking mechanism completely! The heavy iron lid pops open.',
-      failureOutcomeTitle: 'Recoil Shock!',
+      failureOutcomeTitle: 'Recoil Shock & Latch Jammed!',
       failureOutcomeDesc:
-        'The hardened iron chest deflects your blow with an echoing ring. You take 2 recoil damage!',
+        'The hardened iron chest deflects your blow with an echoing ring. The latch is warped and ruined! You take 2 recoil damage.',
       onSuccess: () => {
         if (room.chest) {
           room.chest.isLocked = false;
@@ -173,9 +181,14 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onUpdateRoom({ ...room });
       },
       onFailure: () => {
+        if (room.chest) {
+          room.chest.isFailed = true;
+          room.chest.isJammed = true;
+        }
         hero.currentHp = Math.max(1, hero.currentHp - 2);
-        setEventMessage('✖ Failed to bash! The chest resisted your blow. Lost 2 HP from recoil.');
+        setEventMessage('✖ Failed to bash! The chest latch seized tight. Lost 2 HP from recoil.');
         onUpdateHero({ ...hero });
+        onUpdateRoom({ ...room });
       },
     });
     setShowChallengeModal(true);
@@ -215,7 +228,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   // Trap: Disarm with chosen stat (DEX / INT / STR / LCK) via Focused Modal
   const handleDisarmTrap = (stat: StatType = 'DEX') => {
-    if (!room.trap || room.trap.disarmed || room.trap.triggered) return;
+    if (!room.trap || room.trap.disarmed) return;
 
     let bonus = getStatModifier(heroStats[stat]);
     const hasPicksBonus = stat === 'DEX' && hero.lockpicks > 0;
@@ -245,8 +258,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
         : `${statName} Mod (${bonus})`,
       successOutcomeTitle: 'Trap Neutralized!',
       successOutcomeDesc: `You carefully dismantle the trigger mechanism and sever the tripwires. Gained +20 XP!`,
-      failureOutcomeTitle: 'Trap Triggered!',
-      failureOutcomeDesc: `A click rings out as the trigger springs! Darts and blades deploy from the walls.`,
+      failureOutcomeTitle: 'Trap Sprung!',
+      failureOutcomeDesc: `A click rings out as the trigger springs! The trap remains armed and active until disarmed.`,
       onSuccess: () => {
         if (room.trap) {
           room.trap.disarmed = true;
@@ -260,10 +273,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
       onFailure: () => {
         if (room.trap) {
           room.trap.triggered = true;
+          room.trap.disarmed = false;
         }
         const dmgRoll = rollDice(1, 8, 2);
         hero.currentHp = Math.max(0, hero.currentHp - dmgRoll.total);
-        setEventMessage(`✖ Trap Triggered! Took ${dmgRoll.total} physical damage.`);
+        setEventMessage(`✖ Trap Sprung! Took ${dmgRoll.total} damage. The trap remains ARMED and ACTIVE until disarmed.`);
         onUpdateHero({ ...hero });
         onUpdateRoom({ ...room });
       },
@@ -308,7 +322,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   // Secret: Search walls (INT / LCK) via Focused Modal
   const handleSearchSecret = () => {
-    if (!room.secret || room.secret.discovered) return;
+    if (!room.secret || room.secret.discovered || room.secret.isFailed) return;
 
     const useInt = getStatModifier(heroStats.INT) >= getStatModifier(heroStats.LCK);
     const chosenStat: StatType = useInt ? 'INT' : 'LCK';
@@ -329,7 +343,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         'A hollow block clicks inward, swinging open a hidden alcove containing ancient coins and treasures!',
       failureOutcomeTitle: 'Nothing Found',
       failureOutcomeDesc:
-        'After thoroughly tapping the walls and cobblestones, you find no secret mechanisms.',
+        'After thoroughly tapping the walls and cobblestones, you found no secret mechanisms. Search abandoned.',
       onSuccess: () => {
         if (room.secret) {
           room.secret.discovered = true;
@@ -343,7 +357,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onUpdateRoom({ ...room });
       },
       onFailure: () => {
-        setEventMessage('✖ You searched the cracked masonry, but found nothing hidden.');
+        if (room.secret) {
+          room.secret.isFailed = true;
+        }
+        setEventMessage('✖ Search failed & abandoned! You found no secret compartments in these walls.');
+        onUpdateRoom({ ...room });
       },
     });
     setShowChallengeModal(true);
@@ -437,6 +455,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
                 <span className="text-[11px] font-mono text-stone-400">
                   {room.chest.isOpened
                     ? 'Opened'
+                    : room.chest.isFailed || room.chest.isJammed
+                    ? 'Jammed & Abandoned'
                     : room.chest.isLocked
                     ? `Locked (DC ${room.chest.lockDifficulty})`
                     : 'Unlocked'}
@@ -444,45 +464,52 @@ export const RoomView: React.FC<RoomViewProps> = ({
               </div>
 
               {!room.chest.isOpened ? (
-                <div className="space-y-2 mt-3">
-                  {room.chest.isLocked ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        id="btn-pick-lock"
-                        disabled={isRolling}
-                        onClick={handlePickChestLock}
-                        className="p-2.5 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded text-xs font-serif flex flex-col items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <Key className="w-4 h-4 text-cyan-400" />
-                        <span className="font-bold">Pick Lock (DEX)</span>
-                        <span className="text-[10px] text-stone-400 font-mono">
-                          {hero.lockpicks > 0 ? '+3 Lockpick' : 'Standard check'}
-                        </span>
-                      </button>
+                room.chest.isFailed || room.chest.isJammed ? (
+                  <div className="p-2.5 bg-red-950/40 border border-red-800/60 rounded-lg text-xs text-red-300 font-serif flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>Lock mechanism is wrecked and seized shut from failed breach attempts. Abandoned.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2 mt-3">
+                    {room.chest.isLocked ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          id="btn-pick-lock"
+                          disabled={isRolling}
+                          onClick={handlePickChestLock}
+                          className="p-2.5 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded text-xs font-serif flex flex-col items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Key className="w-4 h-4 text-cyan-400" />
+                          <span className="font-bold">Pick Lock (DEX)</span>
+                          <span className="text-[10px] text-stone-400 font-mono">
+                            {hero.lockpicks > 0 ? '+3 Lockpick' : 'Standard check'}
+                          </span>
+                        </button>
 
+                        <button
+                          id="btn-force-chest"
+                          disabled={isRolling}
+                          onClick={handleForceChest}
+                          className="p-2.5 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded text-xs font-serif flex flex-col items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Shield className="w-4 h-4 text-red-400" />
+                          <span className="font-bold">Bash Open (STR)</span>
+                          <span className="text-[10px] text-stone-400 font-mono">
+                            Roll vs DC {room.chest.lockDifficulty + 2}
+                          </span>
+                        </button>
+                      </div>
+                    ) : (
                       <button
-                        id="btn-force-chest"
-                        disabled={isRolling}
-                        onClick={handleForceChest}
-                        className="p-2.5 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded text-xs font-serif flex flex-col items-center gap-1 transition-colors cursor-pointer"
+                        id="btn-open-unlocked-chest"
+                        onClick={handleOpenUnlockedChest}
+                        className="w-full py-2.5 bg-gradient-to-b from-[#8f6834] to-[#593f1c] hover:from-[#a6793d] hover:to-[#6d4d23] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] shadow cursor-pointer"
                       >
-                        <Shield className="w-4 h-4 text-red-400" />
-                        <span className="font-bold">Bash Open (STR)</span>
-                        <span className="text-[10px] text-stone-400 font-mono">
-                          Roll vs DC {room.chest.lockDifficulty + 2}
-                        </span>
+                        Open Chest Lid & Roll Loot Table (1d20)
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      id="btn-open-unlocked-chest"
-                      onClick={handleOpenUnlockedChest}
-                      className="w-full py-2.5 bg-gradient-to-b from-[#8f6834] to-[#593f1c] hover:from-[#a6793d] hover:to-[#6d4d23] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] shadow cursor-pointer"
-                    >
-                      Open Chest Lid & Roll Loot Table (1d20)
-                    </button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )
               ) : (
                 <div className="text-xs text-stone-400 font-serif italic py-1">
                   The chest lies empty, its treasures collected into your backpack.
@@ -493,22 +520,43 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
           {/* 3. Trap Encounter */}
           {room.trap && (
-            <div className="bg-[#241a12] border-2 border-yellow-700/70 rounded-xl p-4 shadow-lg text-stone-200">
+            <div className={`border-2 rounded-xl p-4 shadow-lg text-stone-200 ${
+              room.trap.disarmed
+                ? 'bg-[#1b2419] border-emerald-700/70'
+                : room.trap.triggered
+                ? 'bg-[#2b1712] border-red-600/80 ring-1 ring-red-500/40'
+                : 'bg-[#241a12] border-yellow-700/70'
+            }`}>
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-2 text-yellow-400 font-serif font-bold text-sm">
-                  <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0" />
+                  <AlertTriangle className={`w-5 h-5 shrink-0 ${room.trap.triggered && !room.trap.disarmed ? 'text-red-400 animate-pulse' : 'text-yellow-500'}`} />
                   <span>{room.trap.name}</span>
                 </div>
-                <span className="text-[11px] font-mono bg-[#181109] px-2 py-0.5 rounded border border-yellow-800/60 text-yellow-300">
-                  DC {room.trap.difficulty}
+                <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                  room.trap.disarmed
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                    : room.trap.triggered
+                    ? 'bg-red-950 text-red-300 border-red-700'
+                    : 'bg-[#181109] text-yellow-300 border-yellow-800/60'
+                }`}>
+                  {room.trap.disarmed ? 'DISARMED' : `DC ${room.trap.difficulty}`}
                 </span>
               </div>
               <p className="text-xs text-stone-300 font-serif mb-2.5">{room.trap.description}</p>
 
-              {!room.trap.disarmed && !room.trap.triggered ? (
-                <div className="space-y-2">
+              {!room.trap.disarmed ? (
+                <div className="space-y-2.5">
+                  {room.trap.triggered && (
+                    <div className="p-2.5 bg-red-950/80 border border-red-600/70 rounded-lg text-xs text-red-200 font-serif flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong>Trap Sprung & Still Active:</strong> The hazard triggered on a previous attempt and remains armed! You must disarm it to proceed past it, or you can retreat back the way you came.
+                      </div>
+                    </div>
+                  )}
+
                   <div className="text-[11px] font-serif text-amber-200/90 italic">
-                    Choose your skill approach to deactivate the trap:
+                    {room.trap.triggered ? 'Attempt to deactivate the active trap again:' : 'Choose your skill approach to deactivate the trap:'}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -584,10 +632,27 @@ export const RoomView: React.FC<RoomViewProps> = ({
                       </span>
                     </button>
                   </div>
+
+                  {/* Retreat option if entered from another room */}
+                  {previousRoomId && previousRoomId !== room.id && (
+                    <div className="pt-2 border-t border-[#4d3723] flex items-center justify-between">
+                      <span className="text-[11px] text-stone-400 font-serif italic">
+                        Can't bypass? You can retreat safely:
+                      </span>
+                      <button
+                        id="btn-retreat-from-trap"
+                        onClick={() => onNavigateToRoom(previousRoomId)}
+                        className="px-3 py-1.5 bg-[#2a1c12] hover:bg-[#3d291b] text-amber-200 border border-[#6b4724] rounded text-xs font-serif font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                      >
+                        <Footprints className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Retreat the way you came ➔</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="text-xs text-stone-400 font-serif italic">
-                  {room.trap.disarmed ? '✓ Disarmed and safe to pass.' : '✖ Triggered and deactivated.'}
+                <div className="text-xs text-emerald-400 font-serif italic">
+                  ✓ Trap mechanism disarmed and safe to pass.
                 </div>
               )}
             </div>
@@ -678,7 +743,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
                 <HelpCircle className="w-5 h-5 text-purple-400" />
                 <span>Hidden Wall Compartment</span>
               </div>
-              {!room.secret.discovered ? (
+              {room.secret.discovered ? (
+                <div className="text-xs text-stone-400 font-serif italic">
+                  ✓ Hidden compartment discovered and looted.
+                </div>
+              ) : room.secret.isFailed ? (
+                <div className="text-xs text-stone-400 font-serif italic bg-[#18111f] p-2.5 rounded border border-purple-900/60 flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-stone-500 shrink-0" />
+                  <span>✖ Search abandoned. You inspected the crumbling masonry but found no concealed alcoves.</span>
+                </div>
+              ) : (
                 <button
                   id="btn-search-secret"
                   disabled={isRolling}
@@ -688,10 +762,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
                   <Dices className="w-4 h-4 text-purple-400" />
                   <span>Search Wall (INT/LCK vs DC {room.secret.difficulty})</span>
                 </button>
-              ) : (
-                <div className="text-xs text-stone-400 font-serif italic">
-                  ✓ Hidden compartment discovered and looted.
-                </div>
               )}
             </div>
           )}
@@ -742,6 +812,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
       {/* Loot Roller Modal */}
       <LootRollerModal
         isOpen={showLootModal}
+        hero={hero}
+        onUpdateHero={onUpdateHero}
         title={lootSourceTitle}
         sourceDescription={lootSourceDesc}
         floorNumber={room.floor}
@@ -755,6 +827,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       <ActionChallengeModal
         isOpen={showChallengeModal}
         hero={hero}
+        onUpdateHero={onUpdateHero}
         config={challengeConfig}
         onClose={() => {
           setShowChallengeModal(false);

@@ -18,7 +18,7 @@ import {
   Shield,
   Flame,
 } from 'lucide-react';
-import { DungeonRoom, Monster, RoomType } from '../types/game';
+import { DungeonRoom, HeroCharacter, Monster, RoomType } from '../types/game';
 import {
   ROOM_TABLE_FLOOR_1,
   ROOM_TABLE_FLOOR_2,
@@ -40,6 +40,8 @@ interface ChamberGeneratorModalProps {
   floorNumber: number;
   roomNumber: number;
   isBossRoom?: boolean;
+  hero?: HeroCharacter;
+  onUpdateHero?: (hero: HeroCharacter) => void;
   onGenerationComplete: (generatedRoomData: {
     roomType: RoomType;
     monster?: Monster;
@@ -53,6 +55,8 @@ export const ChamberGeneratorModal: React.FC<ChamberGeneratorModalProps> = ({
   floorNumber,
   roomNumber,
   isBossRoom = false,
+  hero,
+  onUpdateHero,
   onGenerationComplete,
 }) => {
   const [step, setStep] = useState<GenStep>('ROOM_ROLL');
@@ -73,6 +77,23 @@ export const ChamberGeneratorModal: React.FC<ChamberGeneratorModalProps> = ({
   const [finalMonster, setFinalMonster] = useState<Monster | null>(null);
 
   if (!isOpen) return null;
+
+  const handleUseFateReroll = () => {
+    if (!hero || !onUpdateHero || hero.rerollTokens <= 0) return;
+    hero.rerollTokens -= 1;
+    onUpdateHero({ ...hero });
+    sounds.playLevelUp();
+
+    setRoomRoll(null);
+    setRoomRow(null);
+    setMonsterRoll(null);
+    setMonsterRow(null);
+    setBaseMonster(null);
+    setTraitRoll(null);
+    setTraitRow(null);
+    setFinalMonster(null);
+    setStep('ROOM_ROLL');
+  };
 
   // Pick floor table
   const roomTable =
@@ -399,13 +420,38 @@ export const ChamberGeneratorModal: React.FC<ChamberGeneratorModalProps> = ({
               )}
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              {hero && onUpdateHero && (
+                <button
+                  id="btn-fate-reroll-chamber"
+                  disabled={hero.rerollTokens <= 0}
+                  onClick={handleUseFateReroll}
+                  className={`w-full sm:w-auto px-4 py-2.5 rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-2 border shadow-md transition-all ${
+                    hero.rerollTokens > 0
+                      ? 'bg-purple-950/80 hover:bg-purple-900 border-purple-500/80 text-purple-200 cursor-pointer active:scale-95'
+                      : 'bg-stone-900/80 border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                  }`}
+                  title={
+                    hero.rerollTokens > 0
+                      ? `Reroll this chamber using 1 Fate Token (${hero.rerollTokens} available)`
+                      : 'No Fate Tokens available in inventory'
+                  }
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  <span>
+                    {hero.rerollTokens > 0
+                      ? `✦ Fate Reroll Chamber (${hero.rerollTokens} Available)`
+                      : '0 Fate Tokens Available'}
+                  </span>
+                </button>
+              )}
+
               <button
                 onClick={handleFinish}
-                className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 text-stone-950 font-black font-serif rounded-lg shadow-xl flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
+                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 text-stone-950 font-black font-serif rounded-lg shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer transform hover:scale-105 ml-auto"
               >
                 <Check className="w-4 h-4" />
-                Enter Chamber
+                <span>Enter Chamber</span>
               </button>
             </div>
           </div>
