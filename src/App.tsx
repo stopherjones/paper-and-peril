@@ -48,6 +48,7 @@ import { generateDungeonFloor, isRoomPassedThrough, getRoomDisplayInfo } from '.
 import { saveGameState, loadGameState, clearGameState } from './utils/storage';
 import { sounds } from './utils/audio';
 import { rollDice, getStatModifier } from './utils/dice';
+import { ITEMS_DATABASE } from './data/items';
 import {
   addItemToHero,
   consumeHeroRation,
@@ -186,7 +187,7 @@ export default function App() {
     }
 
     const targetRoom = { ...currentFloorObj.rooms[targetRoomId], isRevealed: true };
-    const hero = { ...gameState.hero };
+    const hero = { ...gameState.hero, inventory: [...gameState.hero.inventory] };
     consumeHeroTorch(hero);
 
     setGameState((prev) => ({
@@ -411,63 +412,6 @@ export default function App() {
     }));
   };
 
-  // Dungeon Hearth Resting Actions directly on Main View
-  const handleCampfireRest = () => {
-    if (!gameState.hero || !currentRoom) return;
-    sounds.playHeal();
-    const heroStats = { ...gameState.hero.stats };
-    (Object.values(gameState.hero.equipment) as (GameItem | undefined)[]).forEach((item) => {
-      if (!item?.statBonuses) return;
-      if (item.statBonuses.CON) heroStats.CON += item.statBonuses.CON;
-      if (item.statBonuses.INT) heroStats.INT += item.statBonuses.INT;
-    });
-
-    const hpGain = 12 + getStatModifier(heroStats.CON) * 2;
-    const manaGain = 10 + getStatModifier(heroStats.INT) * 2;
-
-    const updatedHero = {
-      ...gameState.hero,
-      currentHp: Math.min(gameState.hero.maxHp, gameState.hero.currentHp + hpGain),
-      currentMana: Math.min(gameState.hero.maxMana, gameState.hero.currentMana + manaGain),
-    };
-
-    const updatedRoom = { ...currentRoom, isCleared: true };
-    const floorObj = gameState.floors[gameState.currentFloor];
-
-    setGameState((prev) => ({
-      ...prev,
-      hero: updatedHero,
-      floors: {
-        ...prev.floors,
-        [prev.currentFloor]: {
-          ...floorObj,
-          rooms: {
-            ...floorObj.rooms,
-            [currentRoom.id]: updatedRoom,
-          },
-        },
-      },
-      historyLog: [
-        `Rested by the Dungeon Hearth. Restored ${hpGain} HP & ${manaGain} Mana.`,
-        ...prev.historyLog,
-      ],
-    }));
-  };
-
-  const handleEatRation = () => {
-    if (!gameState.hero || gameState.hero.rations <= 0) return;
-    sounds.playHeal();
-    const updatedHero = { ...gameState.hero };
-    consumeHeroRation(updatedHero);
-    updatedHero.currentHp = Math.min(updatedHero.maxHp, updatedHero.currentHp + 10);
-
-    setGameState((prev) => ({
-      ...prev,
-      hero: updatedHero,
-      historyLog: [`Ate salted dungeon rations from backpack. Restored 10 HP.`, ...prev.historyLog],
-    }));
-  };
-
   // Initiate Combat
   const handleEnterCombat = (room: DungeonRoom) => {
     if (!room.monster) return;
@@ -607,10 +551,21 @@ export default function App() {
     }
 
     sounds.playLevelUp();
+    sounds.playHeal();
     const nextFloorObj = generateDungeonFloor(nextFloorNumber);
+
+    // Fully restore HP & Mana upon descending to the next floor's Hearth
+    const updatedHero = gameState.hero
+      ? {
+          ...gameState.hero,
+          currentHp: gameState.hero.maxHp,
+          currentMana: gameState.hero.maxMana,
+        }
+      : gameState.hero;
 
     setGameState((prev) => ({
       ...prev,
+      hero: updatedHero,
       currentFloor: nextFloorNumber,
       currentRoomId: nextFloorObj.startRoomId,
       floors: {
@@ -618,6 +573,10 @@ export default function App() {
         [nextFloorNumber]: nextFloorObj,
       },
       phase: 'EXPLORATION',
+      historyLog: [
+        `Descended the spiral staircase into Floor ${nextFloorNumber}. The warm embers of the entrance Hearth fully revitalized your HP (${updatedHero?.maxHp}/${updatedHero?.maxHp}) & Mana (${updatedHero?.maxMana}/${updatedHero?.maxMana})!`,
+        ...prev.historyLog,
+      ],
     }));
     setPreviousRoomId(nextFloorObj.startRoomId);
     setShowRoomModal(false);
@@ -638,13 +597,19 @@ export default function App() {
     hero.stats[chosenStat] += 2;
     
     // Add Fate Die to inventory & sync
-    addItemToHero(hero, {
-      id: 'dice_of_fate',
-      name: 'Dice of Fate',
-      type: 'relic',
-      value: 25,
-      description: 'A glowing polyhedral die imbued with destiny. Allows rerolling any failed d20 attribute test or combat strike.',
-    }, 1);
+    if (ITEMS_DATABASE['dice_of_fate']) {
+      addItemToHero(hero, ITEMS_DATABASE['dice_of_fate'], 1);
+    } else {
+      addItemToHero(hero, {
+        id: 'dice_of_fate',
+        name: 'Dice of Fate (Reroll Token)',
+        type: 'tool',
+        rarity: 'rare',
+        value: 30,
+        description: 'A mystical bone die that lets you reroll any attack or skill check.',
+        icon: 'Dices',
+      }, 1);
+    }
     syncHeroSupplies(hero);
 
     setPendingLevelUp(false);
@@ -814,25 +779,22 @@ export default function App() {
                     </div>
 
                     {currentRoom.type === 'CAMPFIRE' ? (
-                      <div className="grid grid-cols-2 gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-[11px] text-amber-300 font-serif bg-[#241a12] px-3 py-1.5 rounded-lg border border-amber-700/60 shadow flex items-center gap-2">
+                          <Tent className="w-4 h-4 text-amber-500 shrink-0" />
+                          <div>
+                            <span className="font-bold text-amber-200 block">Entrance Sanctuary</span>
+                            <span className="block text-[10px] text-amber-300/70">Restored on descent</span>
+                          </div>
+                        </div>
                         <button
-                          id="btn-main-rest-campfire"
-                          onClick={handleCampfireRest}
+                          id="btn-main-open-backpack"
+                          onClick={() => setShowInventory(true)}
                           className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
-                          title="Rest by hearth to restore HP and Mana"
+                          title="Open backpack to use rations or potions"
                         >
-                          <Heart className="w-4 h-4 text-red-400" />
-                          <span>Rest & Bandage</span>
-                        </button>
-                        <button
-                          id="btn-main-eat-ration"
-                          disabled={gameState.hero.rations <= 0}
-                          onClick={handleEatRation}
-                          className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer shadow transition-all hover:scale-105 active:scale-95"
-                          title={`Eat provisions to restore 10 HP (${gameState.hero.rations} rations remaining)`}
-                        >
-                          <Flame className="w-4 h-4 text-orange-400" />
-                          <span>Eat Rations ({gameState.hero.rations})</span>
+                          <Package className="w-4 h-4 text-amber-300" />
+                          <span>Backpack</span>
                         </button>
                       </div>
                     ) : currentRoom.isBossRoom && currentRoom.isStairsUnlocked ? (
@@ -916,6 +878,7 @@ export default function App() {
           onSmashWall={handleSmashWall}
           onPhaseThroughWall={handlePhaseThroughWall}
           onDescendFloor={handleDescendFloor}
+          onOpenInventory={() => setShowInventory(true)}
         />
       )}
       {showInventory && gameState.hero && (
@@ -937,8 +900,6 @@ export default function App() {
       )}
 
       {showRulebook && <RulebookModal onClose={() => setShowRulebook(false)} />}
-
-      {showHallOfFame && <HallOfFameModal onClose={() => setShowHallOfFame(false)} />}
 
       {showJournal && gameState.hero && (
         <JournalModal
@@ -980,6 +941,8 @@ export default function App() {
           }}
         />
       )}
+
+      {showHallOfFame && <HallOfFameModal onClose={() => setShowHallOfFame(false)} />}
     </div>
   );
 }

@@ -21,11 +21,14 @@ export interface ClassDefinition {
   title: string;
   description: string;
   primaryStat: StatType;
+  primaryStatBoost: number; // e.g. +3 or +4 to top 3 of 4d6 roll
+  statBonuses: Partial<CharacterStats>; // Archetype bonuses applied to rolled attributes
   baseStats: CharacterStats;
   hpFormula: { base: number; perLevel: number };
   manaFormula: { base: number; perLevel: number };
   startingGold: number;
   startingEquipment: string[]; // Item IDs
+  gearHighlights: { name: string; type: string; bonus: string; icon: string }[];
   skills: HeroSkill[];
   icon: string;
 }
@@ -284,6 +287,8 @@ export interface CombatState {
   };
   combatLogs: CombatLogEntry[];
   heroDefending: boolean;
+  heroStumbled?: boolean;
+  monsterStumbled?: boolean;
   fledSuccessfully?: boolean;
   pendingReward?: {
     xp: number;

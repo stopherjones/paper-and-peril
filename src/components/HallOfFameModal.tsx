@@ -14,10 +14,22 @@ interface HallOfFameModalProps {
 export const HallOfFameModal: React.FC<HallOfFameModalProps> = ({ onClose }) => {
   const scores = getHallOfFame();
 
+  // Escape key listener to close modal
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <div
       id="hall-of-fame-modal-overlay"
-      className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[90] bg-black/85 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
     >
       <div className="bg-[#241a12] border-4 border-[#8c6b45] rounded-xl max-w-2xl w-full p-4 md:p-6 text-stone-200 shadow-2xl relative max-h-[85vh] flex flex-col">
         {/* Header */}

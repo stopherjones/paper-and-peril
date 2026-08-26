@@ -84,6 +84,19 @@ export const RulebookModal: React.FC<RulebookModalProps> = ({ onClose }) => {
             </p>
           </div>
 
+          {/* Sanctuary & Healing Rules */}
+          <div className="bg-[#19110a] p-3.5 rounded-lg border border-[#442e1d]">
+            <h3 className="text-amber-300 font-bold text-sm mb-1.5 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-400" /> Dungeon Hearth & Healing
+            </h3>
+            <p>
+              Descending the spiral stairs to a new dungeon floor triggers the <strong>Entrance Hearth Sanctuary</strong>, completely replenishing your <strong>HP and Mana</strong>.
+            </p>
+            <p className="mt-1.5 text-stone-300">
+              While exploring within a floor, the Hearth cannot be used for repeated resting. To restore vitals mid-level, consume <strong>food rations and healing potions</strong> from your backpack, or discover sacred <strong>divine shrines</strong>.
+            </p>
+          </div>
+
           {/* Dice & Combat Rules */}
           <div className="bg-[#19110a] p-3.5 rounded-lg border border-[#442e1d]">
             <h3 className="text-amber-300 font-bold text-sm mb-1.5 flex items-center gap-1.5">

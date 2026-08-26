@@ -57,6 +57,7 @@ interface RoomModalProps {
   onSmashWall: (wallId: string, item: GameItem) => void;
   onPhaseThroughWall: (targetRoomId: string, item?: GameItem) => void;
   onDescendFloor: () => void;
+  onOpenInventory?: () => void;
 }
 
 export const RoomModal: React.FC<RoomModalProps> = ({
@@ -79,6 +80,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
   onSmashWall,
   onPhaseThroughWall,
   onDescendFloor,
+  onOpenInventory,
 }) => {
   // Listen for Escape key to close modal if not in active attack animation
   useEffect(() => {
@@ -248,6 +250,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
               onSmashWall={onSmashWall}
               onPhaseThroughWall={onPhaseThroughWall}
               onDescendFloor={onDescendFloor}
+              onOpenInventory={onOpenInventory}
               onClose={onClose}
             />
           )}

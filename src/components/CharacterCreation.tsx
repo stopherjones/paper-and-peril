@@ -25,6 +25,12 @@ import {
   Flame,
   ArrowRight,
   Sparkle,
+  Hammer,
+  Shirt,
+  ShieldCheck,
+  Crown,
+  Footprints,
+  BookOpen,
 } from 'lucide-react';
 import { CharacterStats, HeroCharacter, HeroClassId, StatType } from '../types/game';
 import { HERO_CLASSES } from '../data/classes';
@@ -69,16 +75,13 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
   const [currentStep, setCurrentStep] = useState<CreationStep>('CLASS_SELECT');
   const [selectedClassId, setSelectedClassId] = useState<HeroClassId>('warrior');
 
-  // Stat rolling state (4d6 drop lowest mandatory per attribute)
-  const [stats, setStats] = useState<CharacterStats>({
-    STR: 14,
-    DEX: 12,
-    CON: 13,
-    INT: 10,
-    LCK: 11,
-  });
+  const selectedClass =
+    HERO_CLASSES.find((c) => c.id === selectedClassId) || HERO_CLASSES[0];
+
+  // Stat rolling state (4d6 drop lowest + class archetype boost)
+  const [stats, setStats] = useState<CharacterStats>(() => ({ ...selectedClass.baseStats }));
   const [rolledStatBreakdowns, setRolledStatBreakdowns] = useState<
-    Record<StatType, { rolls: number[]; dropped: number; total: number }>
+    Record<StatType, { rolls: number[]; dropped: number; subtotal: number; classBonus: number; total: number }>
   >({} as any);
   const [isRollingCurrentStat, setIsRollingCurrentStat] = useState(false);
   const [rollingStatKey, setRollingStatKey] = useState<StatType | null>(null);
@@ -92,19 +95,21 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
   const [characterName, setCharacterName] = useState('Alden Ironbreaker');
   const [fateTokens, setFateTokens] = useState(2);
 
-  const selectedClass =
-    HERO_CLASSES.find((c) => c.id === selectedClassId) || HERO_CLASSES[0];
-
   // Helper to choose class
   const handleSelectClass = (classId: HeroClassId) => {
     setSelectedClassId(classId);
     sounds.playBlock();
 
+    const newClass = HERO_CLASSES.find((c) => c.id === classId) || HERO_CLASSES[0];
+    setStats({ ...newClass.baseStats });
+    setRolledStatBreakdowns({} as any);
+    setHasRolledAllStats(false);
+
     const nameList = FANTASY_NAMES[classId] || FANTASY_NAMES.warrior;
     setCharacterName(nameList[Math.floor(Math.random() * nameList.length)]);
   };
 
-  // Roll Single Stat (4d6 drop lowest)
+  // Roll Single Stat (4d6 drop lowest + Class Boost)
   const handleRollSingleStat = (statKey: StatType, isFateReroll = false) => {
     if (isRollingCurrentStat) return;
     if (isFateReroll && fateTokens <= 0) return;
@@ -120,20 +125,25 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
       const rollRes = roll4d6DropLowest();
       const rollsSorted = [...rollRes.rolls].sort((a, b) => a - b);
       const droppedValue = rollsSorted[0];
+      const subtotal = rollRes.total;
+      const classBonus = selectedClass.statBonuses?.[statKey] || 0;
+      const finalTotal = subtotal + classBonus;
 
       const newBreakdowns = {
         ...rolledStatBreakdowns,
         [statKey]: {
           rolls: rollRes.rolls,
           dropped: droppedValue,
-          total: rollRes.total,
+          subtotal,
+          classBonus,
+          total: finalTotal,
         },
       };
       setRolledStatBreakdowns(newBreakdowns);
 
       const newStats = {
         ...stats,
-        [statKey]: rollRes.total,
+        [statKey]: finalTotal,
       };
       setStats(newStats);
 
@@ -147,6 +157,45 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
         setHasRolledAllStats(true);
       }
     }, 450);
+  };
+
+  // Roll all remaining attributes in turn
+  const handleRollAllStatsInTurn = () => {
+    if (isRollingCurrentStat) return;
+    setIsRollingCurrentStat(true);
+    sounds.playDiceRoll();
+
+    const newBreakdowns: Record<StatType, { rolls: number[]; dropped: number; subtotal: number; classBonus: number; total: number }> = {
+      ...rolledStatBreakdowns,
+    };
+    const newStats: CharacterStats = { ...stats };
+
+    STAT_ORDER.forEach((item) => {
+      const rollRes = roll4d6DropLowest();
+      const rollsSorted = [...rollRes.rolls].sort((a, b) => a - b);
+      const droppedValue = rollsSorted[0];
+      const subtotal = rollRes.total;
+      const classBonus = selectedClass.statBonuses?.[item.key] || 0;
+      const finalTotal = subtotal + classBonus;
+
+      newBreakdowns[item.key] = {
+        rolls: rollRes.rolls,
+        dropped: droppedValue,
+        subtotal,
+        classBonus,
+        total: finalTotal,
+      };
+      newStats[item.key] = finalTotal;
+    });
+
+    setTimeout(() => {
+      setRolledStatBreakdowns(newBreakdowns);
+      setStats(newStats);
+      setHasRolledAllStats(true);
+      setIsRollingCurrentStat(false);
+      setRollingStatKey(null);
+      sounds.playCoins();
+    }, 550);
   };
 
   // Handle Starting Boon Roll Complete
@@ -199,12 +248,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
       } else if (item.type === 'amulet' && !equipment.amulet) {
         equipment.amulet = item;
       } else {
-        const existing = inventory.find((i) => i.item.id === item.id);
-        if (existing) {
-          existing.quantity += 1;
-        } else {
-          inventory.push({ item, quantity: 1 });
-        }
+        inventory.push({ item, quantity: 1 });
       }
     });
 
@@ -213,7 +257,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
     let extraLockpicks = selectedClassId === 'rogue' ? 3 : 2;
     let extraRations = 3;
     let extraTorches = 2;
-    let extraRerollTokens = 1;
+    let extraRerollTokens = selectedClassId === 'rogue' ? 2 : 1;
 
     const activeBoon = rolledBoon || STARTING_BOON_TABLE.rows[0].data;
 
@@ -231,29 +275,27 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
           if (boonItem.type === 'amulet' && !equipment.amulet) {
             equipment.amulet = boonItem;
           } else {
-            const existing = inventory.find((i) => i.item.id === boonItem.id);
-            if (existing) {
-              existing.quantity += 1;
-            } else {
-              inventory.push({ item: boonItem, quantity: 1 });
-            }
+            inventory.push({ item: boonItem, quantity: 1 });
           }
         }
       }
     }
 
-    // Add supplies directly into backpack inventory as tangible items taking up slots
-    if (extraRations > 0 && ITEMS_DATABASE['dungeon_ration']) {
-      inventory.push({ item: ITEMS_DATABASE['dungeon_ration'], quantity: extraRations });
+    // Add physical supplies into backpack inventory (each takes 1 slot)
+    for (let i = 0; i < extraRations; i++) {
+      if (ITEMS_DATABASE['dungeon_ration']) {
+        inventory.push({ item: ITEMS_DATABASE['dungeon_ration'], quantity: 1 });
+      }
     }
-    if (extraLockpicks > 0 && ITEMS_DATABASE['iron_lockpick']) {
-      inventory.push({ item: ITEMS_DATABASE['iron_lockpick'], quantity: extraLockpicks });
+    for (let i = 0; i < extraLockpicks; i++) {
+      if (ITEMS_DATABASE['iron_lockpick']) {
+        inventory.push({ item: ITEMS_DATABASE['iron_lockpick'], quantity: 1 });
+      }
     }
-    if (extraTorches > 0 && ITEMS_DATABASE['dungeon_torch']) {
-      inventory.push({ item: ITEMS_DATABASE['dungeon_torch'], quantity: extraTorches });
-    }
-    if (extraRerollTokens > 0 && ITEMS_DATABASE['dice_of_fate']) {
-      inventory.push({ item: ITEMS_DATABASE['dice_of_fate'], quantity: extraRerollTokens });
+    for (let i = 0; i < extraTorches; i++) {
+      if (ITEMS_DATABASE['dungeon_torch']) {
+        inventory.push({ item: ITEMS_DATABASE['dungeon_torch'], quantity: 1 });
+      }
     }
 
     const hero: HeroCharacter = {
@@ -270,7 +312,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
       baseStats: { ...stats },
       equipment,
       inventory,
-      maxInventorySlots: 12,
+      maxInventorySlots: 15,
       gold: startingGold,
       rerollTokens: extraRerollTokens,
       rations: extraRations,
@@ -313,6 +355,41 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
     }
   };
 
+  const getGearIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'Sword':
+        return <Sword className="w-3.5 h-3.5" />;
+      case 'Shield':
+        return <Shield className="w-3.5 h-3.5" />;
+      case 'ShieldAlert':
+        return <ShieldAlert className="w-3.5 h-3.5" />;
+      case 'ShieldCheck':
+        return <ShieldCheck className="w-3.5 h-3.5" />;
+      case 'Zap':
+        return <Zap className="w-3.5 h-3.5" />;
+      case 'Wand':
+        return <Wand2 className="w-3.5 h-3.5" />;
+      case 'Target':
+        return <Target className="w-3.5 h-3.5" />;
+      case 'Hammer':
+        return <Hammer className="w-3.5 h-3.5" />;
+      case 'Shirt':
+        return <Shirt className="w-3.5 h-3.5" />;
+      case 'Crown':
+        return <Crown className="w-3.5 h-3.5" />;
+      case 'Footprints':
+        return <Footprints className="w-3.5 h-3.5" />;
+      case 'Key':
+        return <Key className="w-3.5 h-3.5" />;
+      case 'BookOpen':
+        return <BookOpen className="w-3.5 h-3.5" />;
+      case 'Sparkles':
+        return <Sparkles className="w-3.5 h-3.5" />;
+      default:
+        return <Package className="w-3.5 h-3.5" />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0d0906] text-amber-100 flex flex-col justify-between p-4 md:p-8 font-sans selection:bg-amber-800 selection:text-amber-100">
       {/* Header */}
@@ -325,7 +402,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
           CHOOSE YOUR ADVENTURER
         </h1>
         <p className="text-sm md:text-base text-stone-400 mt-1 max-w-xl mx-auto font-serif italic">
-          Select your class archetype, roll your attributes (4d6 drop lowest), and roll for your starting heirloom.
+          Select your class archetype, roll your attributes (4d6 drop lowest + class archetype boost), and roll for your starting heirloom.
         </p>
 
         {/* Step Indicator */}
@@ -375,9 +452,13 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
             </div>
 
             {/* 6 Class Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
               {HERO_CLASSES.map((heroClass) => {
                 const isSelected = selectedClassId === heroClass.id;
+                const bonusesList = Object.entries(heroClass.statBonuses || {})
+                  .map(([st, val]) => `+${val} ${st}`)
+                  .join(', ');
+
                 return (
                   <button
                     key={heroClass.id}
@@ -419,13 +500,40 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                       <p className="text-xs text-stone-300 font-serif leading-relaxed mb-3">
                         {heroClass.description}
                       </p>
+
+                      {/* Starting Equipment Highlight Box */}
+                      <div className="mb-3 p-2 rounded-lg bg-stone-950/80 border border-amber-950 text-[11px] space-y-1">
+                        <div className="text-[10px] font-mono font-bold text-amber-400/90 uppercase tracking-wider flex items-center gap-1">
+                          <Sword className="w-3 h-3 text-amber-400" />
+                          <span>Starting Arsenal & Gear</span>
+                        </div>
+                        {heroClass.gearHighlights.map((gear, gIdx) => (
+                          <div key={gIdx} className="flex items-center justify-between gap-1 text-stone-300">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="text-amber-400">{getGearIcon(gear.icon)}</span>
+                              <span className="font-medium truncate">{gear.name}</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-amber-300/80 shrink-0 font-bold">
+                              {gear.bonus}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="space-y-2 pt-2 border-t border-amber-900/40 text-[11px] font-mono">
+                    <div className="space-y-1.5 pt-2 border-t border-amber-900/40 text-[11px] font-mono">
                       <div className="flex justify-between items-center">
                         <span className="text-stone-400">Primary Stat:</span>
-                        <span className="px-2 py-0.5 rounded bg-amber-950 border border-amber-800 text-amber-300 font-bold">
-                          {heroClass.primaryStat}
+                        <div className="flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded bg-amber-950 border border-amber-700 text-amber-300 font-bold">
+                            {heroClass.primaryStat} (+{heroClass.primaryStatBoost} Boost)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-stone-400">
+                        <span>Stat Boosts:</span>
+                        <span className="text-emerald-400 font-bold">
+                          {bonusesList}
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-stone-400">
@@ -458,12 +566,15 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                       Selected Hero Class
                     </span>
                     <span className="text-xs font-serif text-stone-400">• {selectedClass.title}</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-950 border border-amber-700 text-amber-300 text-[10px] font-mono font-bold">
+                      Primary {selectedClass.primaryStat} (+{selectedClass.primaryStatBoost} Boost)
+                    </span>
                   </div>
                   <h4 className="text-xl font-serif font-black text-amber-200">
                     {selectedClass.name}
                   </h4>
                   <p className="text-xs text-stone-300 mt-0.5">
-                    Starting Gear: {selectedClass.startingEquipment.map((id) => ITEMS_DATABASE[id]?.name || id).join(', ')}
+                    Starting Loadout: {selectedClass.startingEquipment.map((id) => ITEMS_DATABASE[id]?.name || id).join(', ')}
                   </p>
                 </div>
               </div>
@@ -475,7 +586,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                 }}
                 className="px-6 py-3.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 text-stone-950 font-serif font-black rounded-xl shadow-xl flex items-center gap-2 text-sm transition-all cursor-pointer transform hover:scale-105 shrink-0"
               >
-                <span>Confirm {selectedClass.name} & Roll Stats in Turn</span>
+                <span>Confirm {selectedClass.name} & Roll Boosted Attributes</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -483,7 +594,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
         )}
 
         {/* ==================================================== */}
-        {/* STEP 2: ROLL ATTRIBUTES IN TURN (4d6 Drop Lowest) */}
+        {/* STEP 2: ROLL ATTRIBUTES IN TURN (4d6 Drop Lowest + Class Boost) */}
         {/* ==================================================== */}
         {currentStep === 'STATS_ROLL' && (() => {
           const rolledCount = STAT_ORDER.filter((s) => rolledStatBreakdowns[s.key] !== undefined).length;
@@ -495,13 +606,13 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-900/50 pb-4">
                 <div>
                   <span className="px-2.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-amber-400 font-mono text-xs tracking-wider uppercase">
-                    Step 2: Roll Ability Scores in Turn (4d6 Drop Lowest)
+                    Step 2: Roll Ability Scores (4d6 Drop Lowest + Archetype Boost)
                   </span>
                   <h3 className="text-xl font-bold font-serif text-amber-200 mt-1">
                     Rolling Attributes for {selectedClass.name}
                   </h3>
                   <p className="text-xs text-stone-400 mt-0.5">
-                    Roll 4d6 (drop the lowest die) for each attribute in sequence: STR → DEX → CON → INT → LCK.
+                    Roll 4d6 (drop the lowest die) for each stat, plus <span className="text-amber-300 font-bold">+{selectedClass.primaryStatBoost} {selectedClass.name} Primary Boost</span> on your defining attributes.
                   </p>
                 </div>
 
@@ -524,6 +635,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                   const isDone = rolledStatBreakdowns[item.key] !== undefined;
                   const isCurrent = nextStatToRoll?.key === item.key;
                   const val = stats[item.key];
+                  const bonus = selectedClass.statBonuses?.[item.key] || 0;
 
                   return (
                     <div
@@ -537,7 +649,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                       }`}
                     >
                       <div className="text-[10px] font-bold">
-                        {idx + 1}. {item.key}
+                        {idx + 1}. {item.key} {bonus > 0 && <span className="text-amber-400">(+{bonus})</span>}
                       </div>
                       <div className="text-xs font-black mt-0.5">
                         {isDone ? `${val} (✓)` : isCurrent ? '➔ Roll' : 'Pending'}
@@ -555,26 +667,45 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                       {nextStatToRoll.key}
                     </div>
                     <div>
-                      <div className="text-[11px] font-mono text-amber-400 font-bold uppercase tracking-wider">
-                        Current Stat in Turn ({rolledCount + 1} of 5)
+                      <div className="text-[11px] font-mono text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <span>Current Stat in Turn ({rolledCount + 1} of 5)</span>
+                        {(selectedClass.statBonuses?.[nextStatToRoll.key] || 0) > 0 && (
+                          <span className="text-emerald-400 font-bold">
+                            (+{selectedClass.statBonuses?.[nextStatToRoll.key]} {selectedClass.name} Boost)
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm md:text-base font-serif font-bold text-amber-100">
-                        Roll for {nextStatToRoll.label} (4d6 Drop Lowest)
+                        Roll for {nextStatToRoll.label} (4d6 drop lowest + class bonus)
                       </div>
                       <div className="text-xs text-stone-400">
                         {nextStatToRoll.desc}
                       </div>
                     </div>
                   </div>
-                  <button
-                    id={`btn-roll-active-stat-${nextStatToRoll.key}`}
-                    onClick={() => handleRollSingleStat(nextStatToRoll.key)}
-                    disabled={isRollingCurrentStat}
-                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-stone-950 font-serif font-black rounded-lg text-xs md:text-sm flex items-center gap-2 shadow cursor-pointer transition-all shrink-0 hover:scale-105 active:scale-95 disabled:opacity-50"
-                  >
-                    <Dices className="w-4 h-4" />
-                    <span>Roll {nextStatToRoll.label}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      id={`btn-roll-active-stat-${nextStatToRoll.key}`}
+                      onClick={() => handleRollSingleStat(nextStatToRoll.key)}
+                      disabled={isRollingCurrentStat}
+                      className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-stone-950 font-serif font-black rounded-lg text-xs md:text-sm flex items-center gap-2 shadow cursor-pointer transition-all shrink-0 hover:scale-105 active:scale-95 disabled:opacity-50"
+                    >
+                      <Dices className="w-4 h-4" />
+                      <span>Roll {nextStatToRoll.label}</span>
+                    </button>
+                    {!allRolled && (
+                      <button
+                        id="btn-fast-roll-all-stats"
+                        onClick={handleRollAllStatsInTurn}
+                        disabled={isRollingCurrentStat}
+                        className="px-3 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-300 font-mono text-xs rounded-lg border border-stone-600 flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                        title="Roll all 5 stats automatically"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Roll All</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="bg-emerald-950/50 border border-emerald-700/60 rounded-xl p-3.5 flex items-center justify-between gap-3 text-emerald-200">
@@ -583,9 +714,9 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                       ✓
                     </div>
                     <div>
-                      <div className="text-sm font-bold font-serif text-emerald-300">All 5 Attributes Rolled!</div>
+                      <div className="text-sm font-bold font-serif text-emerald-300">All 5 Attributes Rolled & Boosted!</div>
                       <div className="text-xs text-stone-300">
-                        You may spend Fate Tokens to reroll any attribute if desired, or proceed to the Heirloom Table.
+                        Class archetype bonuses have been added. You may spend Fate Tokens to reroll any attribute if desired, or proceed to the Heirloom Table.
                       </div>
                     </div>
                   </div>
@@ -628,6 +759,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                   const value = stats[statKey];
                   const modifier = getStatModifier(value);
                   const isPrimary = selectedClass.primaryStat === statKey;
+                  const classBonus = selectedClass.statBonuses?.[statKey] || 0;
 
                   return (
                     <div
@@ -659,7 +791,12 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                               </span>
                               {isPrimary && (
                                 <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-900/80 border border-amber-600 text-amber-300 uppercase">
-                                  Primary Stat
+                                  Primary (+{selectedClass.primaryStatBoost} Boost)
+                                </span>
+                              )}
+                              {!isPrimary && classBonus > 0 && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-950 border border-emerald-700 text-emerald-400 uppercase">
+                                  +{classBonus} Archetype
                                 </span>
                               )}
                               {isCurrentTurn && (
@@ -687,6 +824,11 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                                   />
                                 ))}
                               </div>
+                              {currentBreakdown.classBonus > 0 && (
+                                <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800">
+                                  +{currentBreakdown.classBonus} Boost
+                                </span>
+                              )}
                               <button
                                 id={`btn-reroll-stat-${statKey}`}
                                 onClick={() => handleRollSingleStat(statKey, true)}
@@ -714,7 +856,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                               }`}
                             >
                               <Dices className="w-3.5 h-3.5" />
-                              <span>Roll 4d6</span>
+                              <span>Roll 4d6 {classBonus > 0 ? `(+${classBonus})` : ''}</span>
                             </button>
                           )}
 

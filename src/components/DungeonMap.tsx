@@ -394,15 +394,6 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
           <div>
             <div className="flex items-center gap-2 font-serif text-xs font-bold text-[#e5b967] tracking-wider uppercase">
               <span>Floor {floor.floorNumber} — 4x4 Floor Grid</span>
-              <button
-                id="btn-floor-chamber-mix-info"
-                onClick={() => setShowChamberMix(!showChamberMix)}
-                className="px-1.5 py-0.5 rounded bg-[#382515] hover:bg-[#52371f] text-amber-300 border border-[#6b4724] transition-colors flex items-center gap-1 cursor-pointer font-sans normal-case text-[10px]"
-                title="View Room Mix Breakdown for Floor"
-              >
-                <Info className="w-3 h-3 text-amber-400" />
-                <span>Chamber Mix</span>
-              </button>
             </div>
             <span className="text-[10px] text-stone-400 font-mono">
               16 Room Tiles ({revealedCount} revealed, {hiddenCount} hidden)
@@ -550,103 +541,6 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
         </div>
       </div>
 
-      {/* Chamber Mix Info Overlay Modal */}
-      {showChamberMix && (
-        <div className="mb-3 p-3.5 bg-[#19110a] border-2 border-amber-600/70 rounded-lg text-stone-200 shadow-xl animate-fade-in">
-          <div className="flex items-center justify-between border-b border-[#4d3622] pb-2 mb-2.5">
-            <div className="flex items-center gap-1.5">
-              <Info className="w-4 h-4 text-amber-400" />
-              <h3 className="font-serif font-bold text-xs text-amber-200 uppercase tracking-wider">
-                Floor {floor.floorNumber} Chamber Distribution & Deck Mix
-              </h3>
-            </div>
-            <button
-              id="btn-close-chamber-mix"
-              onClick={() => setShowChamberMix(false)}
-              className="text-[10px] font-mono text-stone-400 hover:text-stone-100 px-1.5 py-0.5 bg-[#2a1a10] rounded border border-[#523821] cursor-pointer"
-            >
-              ✕ Close
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-serif">
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-red-300 font-bold mb-1">
-                <Skull className="w-3.5 h-3.5 text-red-400" />
-                <span>Monsters ({monsters.length})</span>
-              </div>
-              <p className="text-[10px] text-stone-400">
-                {monsters.filter((m) => m.isCleared).length} Cleared •{' '}
-                {monsters.filter((m) => m.isRevealed && !m.isCleared).length} Active
-              </p>
-            </div>
-
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
-                <Crown className="w-3.5 h-3.5 text-amber-400" />
-                <span>Boss & Stairs (1)</span>
-              </div>
-              <p className="text-[10px] text-stone-400">
-                {bossRoom?.isRevealed ? (bossRoom.isCleared ? 'Defeated' : 'Located') : 'In 1 of 8 Candidate Spots'}
-              </p>
-            </div>
-
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-yellow-300 font-bold mb-1">
-                <Package className="w-3.5 h-3.5 text-yellow-400" />
-                <span>Vaults ({treasures.length})</span>
-              </div>
-              <p className="text-[10px] text-stone-400">
-                {treasures.filter((t) => t.isCleared).length} Looted •{' '}
-                {treasures.filter((t) => !t.isCleared).length} Unopened
-              </p>
-            </div>
-
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-orange-300 font-bold mb-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
-                <span>Traps ({traps.length})</span>
-              </div>
-              <p className="text-[10px] text-stone-400">
-                {traps.filter((t) => t.trap?.disarmed || t.trap?.triggered).length} Neutralized
-              </p>
-            </div>
-
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-cyan-300 font-bold mb-1">
-                <Sun className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Shrines ({shrines.length})</span>
-              </div>
-              <p className="text-[10px] text-stone-400">Stat Blessings & Boons</p>
-            </div>
-
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
-                <Tent className="w-3.5 h-3.5 text-amber-500" />
-                <span>Campfire ({campfires.length})</span>
-              </div>
-              <p className="text-[10px] text-stone-400">Safe Hearth & Rest</p>
-            </div>
-
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-emerald-300 font-bold mb-1">
-                <Store className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Shop ({merchants.length})</span>
-              </div>
-              <p className="text-[10px] text-stone-400">Merchant Goods</p>
-            </div>
-
-            <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
-              <div className="flex items-center gap-1.5 text-purple-300 font-bold mb-1">
-                <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
-                <span>Secrets ({secrets.length})</span>
-              </div>
-              <p className="text-[10px] text-stone-400">Hidden Relic Chamber</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Alert Warning Toast if Wall Blocks Action */}
       {alertMessage && (
         <div className="mb-2.5 p-2.5 bg-red-950/95 border-2 border-red-500 rounded-lg text-center text-xs font-serif text-red-200 animate-shake flex items-center justify-between gap-2 shadow-lg">
@@ -775,7 +669,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
             {/* Action buttons based on chamber completion state */}
             {currentRoom.type === 'CAMPFIRE' ? (
               <span className="text-[11px] font-serif text-amber-300 font-bold bg-[#26170d] px-2 py-0.5 rounded border border-[#5a3619]">
-                Safe Hearth
+                Entrance Sanctuary
               </span>
             ) : currentRoom.isBossRoom && currentRoom.isStairsUnlocked ? (
               <button
@@ -1129,6 +1023,120 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
         </div>
       </div>
 
+      {/* Chamber Mix Action & Breakdown Directly Underneath 4x4 Grid Map */}
+      <div className="mt-2.5">
+        <button
+          id="btn-floor-chamber-mix-info"
+          onClick={() => setShowChamberMix(!showChamberMix)}
+          className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-[#2a1a10] via-[#352214] to-[#2a1a10] hover:from-[#3a2517] hover:via-[#472f1c] hover:to-[#3a2517] text-amber-300 hover:text-amber-200 border border-[#6b4724] transition-all flex items-center justify-between gap-2 cursor-pointer font-serif text-xs font-bold shadow-md active:scale-[0.99]"
+          title="View Chamber Distribution & Deck Mix for Floor"
+        >
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Floor {floor.floorNumber} Chamber Mix</span>
+            <span className="text-[10px] font-mono text-stone-400 font-normal">
+              (16 Cards: {revealedCount} Revealed, {hiddenCount} Hidden)
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-amber-400 bg-[#1a100a] px-2 py-0.5 rounded border border-[#523821]">
+            {showChamberMix ? '▲ Hide Breakdown' : '▼ View Breakdown'}
+          </span>
+        </button>
+
+        {/* Chamber Mix Info Breakdown Panel */}
+        {showChamberMix && (
+          <div className="mt-2 p-3 bg-[#19110a] border-2 border-amber-600/70 rounded-lg text-stone-200 shadow-xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-[#4d3622] pb-1.5 mb-2">
+              <div className="flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-amber-400" />
+                <h3 className="font-serif font-bold text-xs text-amber-200 uppercase tracking-wider">
+                  Floor {floor.floorNumber} Deck Composition (16 Total Tiles)
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono text-amber-400">
+                1 Hearth • 1 Boss • 14 Dungeon Encounters
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-serif">
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-red-300 font-bold mb-1">
+                  <Skull className="w-3.5 h-3.5 text-red-400" />
+                  <span>Monsters ({monsters.length})</span>
+                </div>
+                <p className="text-[10px] text-stone-400">
+                  {monsters.filter((m) => m.isCleared).length} Cleared •{' '}
+                  {monsters.filter((m) => m.isRevealed && !m.isCleared).length} Active
+                </p>
+              </div>
+
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Boss & Stairs (1)</span>
+                </div>
+                <p className="text-[10px] text-stone-400">
+                  {bossRoom?.isRevealed ? (bossRoom.isCleared ? 'Defeated' : 'Located') : 'In 1 of 8 Candidate Spots'}
+                </p>
+              </div>
+
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-yellow-300 font-bold mb-1">
+                  <Package className="w-3.5 h-3.5 text-yellow-400" />
+                  <span>Vaults ({treasures.length})</span>
+                </div>
+                <p className="text-[10px] text-stone-400">
+                  {treasures.filter((t) => t.isCleared).length} Looted •{' '}
+                  {treasures.filter((t) => !t.isCleared).length} Unopened
+                </p>
+              </div>
+
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-orange-300 font-bold mb-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
+                  <span>Traps ({traps.length})</span>
+                </div>
+                <p className="text-[10px] text-stone-400">
+                  {traps.filter((t) => t.trap?.disarmed || t.trap?.triggered).length} Neutralized
+                </p>
+              </div>
+
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-cyan-300 font-bold mb-1">
+                  <Sun className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Shrines ({shrines.length})</span>
+                </div>
+                <p className="text-[10px] text-stone-400">Stat Blessings & Boons</p>
+              </div>
+
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
+                  <Tent className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Hearth ({campfires.length})</span>
+                </div>
+                <p className="text-[10px] text-stone-400">Floor Sanctuary [1,1]</p>
+              </div>
+
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-emerald-300 font-bold mb-1">
+                  <Store className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Shop ({merchants.length})</span>
+                </div>
+                <p className="text-[10px] text-stone-400">Merchant Goods</p>
+              </div>
+
+              <div className="bg-[#24170e] p-2 rounded border border-[#442b1a]">
+                <div className="flex items-center gap-1.5 text-purple-300 font-bold mb-1">
+                  <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Secrets ({secrets.length})</span>
+                </div>
+                <p className="text-[10px] text-stone-400">Hidden Relic Chamber</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Interactive Tile Inspector / Actions Panel */}
       {selectedRoom && (() => {
         const selectedInfo = getRoomDisplayInfo(selectedRoom);
@@ -1174,7 +1182,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                 selectedRoom.type === 'CAMPFIRE' ? (
                   <div className="text-[11px] text-amber-300 font-serif font-bold bg-[#26170d] px-2.5 py-1.5 rounded border border-[#5a3619] flex items-center gap-1.5">
                     <Tent className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Safe Hearth (Rest & Provisions Available Below)</span>
+                    <span>Floor Sanctuary (Vitals Restored on Descent)</span>
                   </div>
                 ) : selectedRoom.isBossRoom && selectedRoom.isStairsUnlocked ? (
                   <button

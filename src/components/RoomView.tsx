@@ -46,6 +46,7 @@ interface RoomViewProps {
   onSmashWall: (wallId: string, item: GameItem) => void;
   onPhaseThroughWall: (targetRoomId: string, item?: GameItem) => void;
   onDescendFloor: () => void;
+  onOpenInventory?: () => void;
   onClose?: () => void;
 }
 
@@ -63,6 +64,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   onSmashWall,
   onPhaseThroughWall,
   onDescendFloor,
+  onOpenInventory,
   onClose,
 }) => {
   const [currentRoll, setCurrentRoll] = useState<RollResult | null>(null);
@@ -283,29 +285,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
       },
     });
     setShowChallengeModal(true);
-  };
-
-  // Campfire: Rest & Recover
-  const handleCampfireRest = () => {
-    sounds.playHeal();
-    const hpGain = 12 + getStatModifier(heroStats.CON) * 2;
-    const manaGain = 10 + getStatModifier(heroStats.INT) * 2;
-    hero.currentHp = Math.min(hero.maxHp, hero.currentHp + hpGain);
-    hero.currentMana = Math.min(hero.maxMana, hero.currentMana + manaGain);
-    room.isCleared = true;
-    setEventMessage(`✦ Rested by the hearth. Restored ${hpGain} HP and ${manaGain} Mana!`);
-    onUpdateHero({ ...hero });
-    onUpdateRoom({ ...room });
-  };
-
-  // Campfire: Eat Rations
-  const handleEatRation = () => {
-    if (hero.rations <= 0) return;
-    sounds.playHeal();
-    hero.rations -= 1;
-    hero.currentHp = Math.min(hero.maxHp, hero.currentHp + 10);
-    setEventMessage(`✦ Ate salted dungeon rations. Restored 10 HP.`);
-    onUpdateHero({ ...hero });
   };
 
   // Shrine: Pray
@@ -658,35 +637,37 @@ export const RoomView: React.FC<RoomViewProps> = ({
             </div>
           )}
 
-          {/* 4. Campfire Hearth */}
+          {/* 4. Campfire Hearth Sanctuary */}
           {room.type === 'CAMPFIRE' && (
-            <div className="bg-[#241a12] border-2 border-amber-700/70 rounded-xl p-4 shadow-lg text-stone-200">
-              <div className="flex items-center gap-2 text-amber-400 font-serif font-bold text-sm mb-2">
-                <Tent className="w-5 h-5 text-amber-500" />
-                <span>Dungeon Hearth & Rest Spot</span>
+            <div className="bg-[#241a12] border-2 border-amber-700/70 rounded-xl p-4 shadow-lg text-stone-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-400 font-serif font-bold text-sm">
+                  <Tent className="w-5 h-5 text-amber-500" />
+                  <span>Dungeon Hearth (Floor Sanctuary)</span>
+                </div>
+                <span className="text-[10px] font-mono font-bold bg-amber-950/80 text-amber-300 px-2 py-0.5 rounded border border-amber-700/50">
+                  Entrance Haven
+                </span>
               </div>
-              <p className="text-xs text-stone-300 font-serif mb-3">
-                Sheltered stone alcove where you can bandage battle wounds and cook provisions.
+              <p className="text-xs text-stone-300 font-serif leading-relaxed">
+                A safe, sheltered alcove around the floor entrance staircase. Your <strong>HP and Mana were fully replenished</strong> when you descended to this floor.
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  id="btn-rest-campfire"
-                  onClick={handleCampfireRest}
-                  className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded text-xs font-serif font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Heart className="w-4 h-4 text-red-400" />
-                  <span>Rest & Bandage</span>
-                </button>
-                <button
-                  id="btn-eat-ration"
-                  disabled={hero.rations <= 0}
-                  onClick={handleEatRation}
-                  className="py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded text-xs font-serif font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer"
-                >
-                  <Flame className="w-4 h-4 text-orange-400" />
-                  <span>Eat Rations ({hero.rations})</span>
-                </button>
+              <div className="bg-[#18110c] border border-amber-900/60 rounded-lg p-3 text-xs font-serif text-amber-200/90 flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed text-amber-200/90">
+                  <strong className="text-amber-300">Sanctuary Rules:</strong> Mid-level resting at the hearth is not permitted. While exploring this floor, use <strong>food rations and healing potions</strong> directly from your backpack, or seek out sacred <strong>divine shrines</strong> to restore your health and mana.
+                </div>
               </div>
+              {onOpenInventory && (
+                <button
+                  id="btn-open-backpack-hearth"
+                  onClick={onOpenInventory}
+                  className="w-full py-2.5 px-3 bg-[#382617] hover:bg-[#4d3521] text-amber-200 border border-[#6b4c2b] rounded-lg text-xs font-serif font-bold flex items-center justify-center gap-2 cursor-pointer shadow transition-all hover:scale-[1.01] active:scale-[0.98]"
+                >
+                  <Package className="w-4 h-4 text-amber-300" />
+                  <span>Open Backpack (Rations & Potions)</span>
+                </button>
+              )}
             </div>
           )}
 

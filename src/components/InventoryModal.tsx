@@ -68,11 +68,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     hero.equipment[slotKey] = item;
 
     // Remove from inventory
-    if (inv.quantity > 1) {
-      inv.quantity -= 1;
-    } else {
-      hero.inventory.splice(invIdx, 1);
-    }
+    hero.inventory.splice(invIdx, 1);
 
     if (oldItem) {
       hero.inventory.push({ item: oldItem, quantity: 1 });
@@ -114,12 +110,8 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
       hero.currentMana = Math.min(hero.maxMana, hero.currentMana + item.healMana);
     }
 
-    if (inv.quantity > 1) {
-      inv.quantity -= 1;
-    } else {
-      hero.inventory.splice(invIdx, 1);
-      setSelectedItemIdx(null);
-    }
+    hero.inventory.splice(invIdx, 1);
+    setSelectedItemIdx(null);
 
     syncHeroSupplies(hero);
     onUpdateHero({ ...hero });
@@ -181,6 +173,19 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Dedicated Fate Reroll Tokens Display */}
+            <div
+              id="inv-fate-tokens-display"
+              className="flex items-center gap-2 bg-[#1b1226] px-3 py-1.5 rounded-lg border-2 border-purple-500/80 text-purple-200 font-mono shadow-inner"
+              title="Fate Reroll Tokens (Used for retrying d20 checks, attack rolls, and vault loot)"
+            >
+              <Dices className="w-4 h-4 text-purple-400" />
+              <div className="flex flex-col text-left leading-none">
+                <span className="text-[9px] text-purple-400 uppercase font-sans font-bold">Fate Dice</span>
+                <span className="text-sm font-bold text-purple-200">{hero.rerollTokens} Available</span>
+              </div>
+            </div>
+
             {/* Prominent Gold Coin Purse Display */}
             <div
               id="inv-gold-display"
@@ -225,6 +230,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                 style={{ width: `${Math.min(100, (hero.inventory.length / hero.maxInventorySlots) * 100)}%` }}
               />
             </div>
+            <span className="text-[10px] text-stone-500 hidden md:inline">
+              (1 item per slot)
+            </span>
           </div>
 
           <div className="flex items-center gap-2 text-stone-300">
@@ -232,7 +240,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               <button
                 id="inv-quick-ration"
                 onClick={() => {
-                  const res = handleUseItem(hero.inventory.findIndex((i) => i.item.id === 'dungeon_ration'));
+                  handleUseItem(hero.inventory.findIndex((i) => i.item.id === 'dungeon_ration'));
                 }}
                 className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#24160d] hover:bg-[#382315] border border-[#4d2f1b] transition-colors cursor-pointer text-amber-200"
                 title="Eat 1 Ration from pack (+8 HP)"
@@ -335,11 +343,11 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xs font-serif font-bold text-[#e6c898] uppercase tracking-wider">
-                  Backpack Storage ({hero.inventory.length} / {hero.maxInventorySlots} Items)
+                  Backpack Storage ({hero.inventory.length} / {hero.maxInventorySlots} Slots)
                 </h3>
               </div>
 
-              {/* Grid of items */}
+              {/* Grid of items (each item occupies 1 slot) */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {hero.inventory.map((inv, idx) => {
                   const isSelected = selectedItemIdx === idx;
@@ -365,19 +373,25 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-stone-400 font-mono mt-1 pt-1 border-t border-[#362315]/60">
                         <span className="text-[9px] text-amber-400/80 truncate">{getItemCategoryLabel(inv.item)}</span>
-                        {inv.quantity > 1 && (
-                          <span className="text-amber-300 font-bold bg-[#29170a] px-1 rounded border border-[#4d2c12]">
-                            x{inv.quantity}
-                          </span>
-                        )}
+                        <span className="text-[9px] text-yellow-400/90 font-mono">{inv.item.value}g</span>
                       </div>
                     </button>
                   );
                 })}
+
+                {/* Empty slot indicators */}
+                {Array.from({ length: Math.max(0, hero.maxInventorySlots - hero.inventory.length) }).map((_, i) => (
+                  <div
+                    key={`empty-slot-${i}`}
+                    className="p-2 rounded-lg border border-dashed border-[#382618]/70 bg-[#120c08]/50 flex flex-col items-center justify-center min-h-[68px] text-[10px] font-mono text-stone-600 select-none"
+                  >
+                    <span>[ Empty Slot ]</span>
+                  </div>
+                ))}
               </div>
 
               {hero.inventory.length === 0 && (
-                <div className="text-center py-8 text-stone-500 font-serif text-xs">
+                <div className="text-center py-4 text-stone-500 font-serif text-xs">
                   Your backpack is empty.
                 </div>
               )}
@@ -395,7 +409,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                 </div>
 
                 <div className="text-[10px] font-mono text-amber-400/80 uppercase mb-1">
-                  Category: {getItemCategoryLabel(selectedInv.item)} {selectedInv.quantity > 1 ? `• Stack: ${selectedInv.quantity}` : ''}
+                  Category: {getItemCategoryLabel(selectedInv.item)} • 1 Slot
                 </div>
 
                 <p className="text-xs text-stone-300 font-serif leading-tight mb-2">

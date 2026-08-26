@@ -100,7 +100,7 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
   };
 
   const handleUseFateReroll = () => {
-    if (hero.rerollTokens <= 0) return;
+    if (hero.rerollTokens <= 0 || rollResult?.isFumble) return;
     hero.rerollTokens -= 1;
     onUpdateHero?.({ ...hero });
     sounds.playDiceRoll();
@@ -261,41 +261,53 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
                 </div>
               </div>
 
-              {/* Fate Reroll Option on Failure */}
+              {/* Fate Reroll Option on Failure (Blocked on Critical Fumbles) */}
               {!isSuccess && (
-                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
-                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
-                      <span>Defy Fate & Alter Destiny</span>
+                rollResult?.isFumble ? (
+                  <div className="p-3.5 bg-gradient-to-r from-red-950/70 via-[#210f0f] to-red-950/70 border-2 border-red-800/80 rounded-xl shadow-lg flex items-center gap-3 text-xs font-serif text-red-200">
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                    <div>
+                      <span className="font-bold text-red-300">Fate Cannot Alter a Critical Fumble (Natural 1):</span>
+                      <p className="text-red-300/80 text-[11px] mt-0.5 leading-relaxed">
+                        A Natural 1 represents an irreversible catastrophe. Fate Rerolls cannot be spent on Critical Fumbles.
+                      </p>
                     </div>
-                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
-                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
-                    </span>
                   </div>
+                ) : (
+                  <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                        <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                        <span>Defy Fate & Alter Destiny</span>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                        {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                      </span>
+                    </div>
 
-                  <p className="text-xs text-purple-300/90 font-serif">
-                    Spend 1 Fate Reroll from your inventory to immediately re-roll this {config.stat} check.
-                  </p>
+                    <p className="text-xs text-purple-300/90 font-serif">
+                      Spend 1 Fate Reroll from your inventory to immediately re-roll this {config.stat} check.
+                    </p>
 
-                  <button
-                    id="btn-use-fate-reroll-challenge"
-                    disabled={hero.rerollTokens <= 0}
-                    onClick={handleUseFateReroll}
-                    className={`w-full py-3 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
-                      hero.rerollTokens > 0
-                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
-                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    <Dices className="w-4 h-4 text-purple-200" />
-                    <span>
-                      {hero.rerollTokens > 0
-                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available)`
-                        : 'No Fate Tokens Available in Inventory'}
-                    </span>
-                  </button>
-                </div>
+                    <button
+                      id="btn-use-fate-reroll-challenge"
+                      disabled={hero.rerollTokens <= 0}
+                      onClick={handleUseFateReroll}
+                      className={`w-full py-3 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                        hero.rerollTokens > 0
+                          ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                          : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <Dices className="w-4 h-4 text-purple-200" />
+                      <span>
+                        {hero.rerollTokens > 0
+                          ? `✦ Use Fate Reroll (${hero.rerollTokens} Available)`
+                          : 'No Fate Tokens Available in Inventory'}
+                      </span>
+                    </button>
+                  </div>
+                )
               )}
 
               {/* Acknowledge Button */}

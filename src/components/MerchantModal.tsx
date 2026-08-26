@@ -39,10 +39,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
       return;
     }
 
-    const isStackable = ['potion', 'scroll', 'tool', 'treasure'].includes(item.type);
-    const existing = isStackable ? hero.inventory.find((inv) => inv.item.id === item.id) : null;
-
-    if (!existing && hero.inventory.length >= hero.maxInventorySlots) {
+    if (item.id !== 'dice_of_fate' && hero.inventory.length >= hero.maxInventorySlots) {
       setFeedback(`“Your backpack is stuffed to the brim! (${hero.inventory.length}/${hero.maxInventorySlots} slots used). Make room first.”`);
       sounds.playBlock();
       return;
@@ -73,11 +70,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
     sounds.playCoins();
     hero.gold += sellPrice;
 
-    if (invItem.quantity > 1) {
-      invItem.quantity -= 1;
-    } else {
-      hero.inventory.splice(inventoryIdx, 1);
-    }
+    hero.inventory.splice(inventoryIdx, 1);
 
     syncHeroSupplies(hero);
     setFeedback(`“Pleasure doing business! +${sellPrice} Gold paid for ${invItem.item.name}.”`);
@@ -98,6 +91,35 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
     hero.currentHp = hero.maxHp;
     hero.currentMana = hero.maxMana;
     setFeedback('“Enjoy the hearty stew! Your wounds are patched and stamina fully restored.”');
+    onUpdateHero({ ...hero });
+  };
+
+  // Backpack Upgrade Service
+  const getBackpackUpgradeCost = () => {
+    if (hero.maxInventorySlots < 20) return 25;
+    if (hero.maxInventorySlots < 25) return 45;
+    if (hero.maxInventorySlots < 30) return 75;
+    return null; // Max reached
+  };
+
+  const handleUpgradeBackpack = () => {
+    const cost = getBackpackUpgradeCost();
+    if (cost === null) {
+      setFeedback('“Your rucksack has already reached maximum reinforced capacity (30 Slots)!”');
+      sounds.playBlock();
+      return;
+    }
+
+    if (hero.gold < cost) {
+      setFeedback(`“Reinforcing and expanding your backpack with reinforced leather straps costs ${cost} Gold.”`);
+      sounds.playBlock();
+      return;
+    }
+
+    sounds.playLevelUp();
+    hero.gold -= cost;
+    hero.maxInventorySlots += 5;
+    setFeedback(`“Backpack expanded! Capacity increased to ${hero.maxInventorySlots} Slots (+5 Slots).”`);
     onUpdateHero({ ...hero });
   };
 
@@ -242,17 +264,17 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
                       >
                         <div>
                           <span className="font-serif font-bold text-xs text-amber-200 block">
-                            {inv.item.name} {inv.quantity > 1 ? `(x${inv.quantity})` : ''}
+                            {inv.item.name}
                           </span>
                           <span className="text-[10px] text-stone-400 font-serif">
-                            Value: {sellPrice} Gold each
+                            Value: {sellPrice} Gold (1 Slot)
                           </span>
                         </div>
 
                         <button
-                          id={`btn-sell-${inv.item.id}`}
+                          id={`btn-sell-${inv.item.id}-${idx}`}
                           onClick={() => handleSell(idx)}
-                          className="px-3 py-1 bg-[#472d17] hover:bg-[#613e20] text-amber-100 rounded text-xs font-serif font-bold border border-[#784e27] transition-colors"
+                          className="px-3 py-1 bg-[#472d17] hover:bg-[#613e20] text-amber-100 rounded text-xs font-serif font-bold border border-[#784e27] transition-colors cursor-pointer"
                         >
                           Sell (+{sellPrice}G)
                         </button>
@@ -265,21 +287,60 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
           )}
 
           {activeTab === 'service' && (
-            <div className="bg-[#1b130c] border border-[#4d3623] p-4 rounded-lg text-center space-y-3">
-              <Heart className="w-8 h-8 text-red-400 mx-auto" />
-              <h3 className="text-base font-serif font-bold text-[#f5e4c6]">Tavern Hearth & Bandages</h3>
-              <p className="text-xs text-stone-300 font-serif max-w-md mx-auto">
-                Olaf brews a hot herbal tonic and expertly dresses all your wounds. Instantly restores 100% of your Hit Points and Mana.
-              </p>
-              <div className="font-mono text-sm text-yellow-300 font-bold">Cost: 12 Gold</div>
-              <button
-                id="btn-buy-tavern-rest"
-                disabled={hero.gold < 12}
-                onClick={handleMerchantRest}
-                className="px-6 py-2 bg-gradient-to-b from-[#8f6437] to-[#593b1d] hover:from-[#a67440] hover:to-[#6d4924] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] shadow disabled:opacity-40"
-              >
-                Pay 12 Gold & Rest
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Tavern Rest */}
+              <div className="bg-[#1b130c] border border-[#4d3623] p-3.5 rounded-lg flex flex-col justify-between text-center space-y-2">
+                <Heart className="w-6 h-6 text-red-400 mx-auto" />
+                <div>
+                  <h3 className="text-sm font-serif font-bold text-[#f5e4c6]">Tavern Hearth & Bandages</h3>
+                  <p className="text-[11px] text-stone-300 font-serif leading-tight mt-1">
+                    Hot herbal tonic and fresh bandages. Instantly restores 100% of your Hit Points and Mana.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <div className="font-mono text-xs text-yellow-300 font-bold mb-1.5">Cost: 12 Gold</div>
+                  <button
+                    id="btn-buy-tavern-rest"
+                    disabled={hero.gold < 12}
+                    onClick={handleMerchantRest}
+                    className="w-full py-1.5 bg-gradient-to-b from-[#8f6437] to-[#593b1d] hover:from-[#a67440] hover:to-[#6d4924] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] shadow disabled:opacity-40 cursor-pointer"
+                  >
+                    Pay 12 Gold & Rest
+                  </button>
+                </div>
+              </div>
+
+              {/* Backpack Expansion */}
+              <div className="bg-[#1b130c] border border-[#4d3623] p-3.5 rounded-lg flex flex-col justify-between text-center space-y-2">
+                <Package className="w-6 h-6 text-amber-400 mx-auto" />
+                <div>
+                  <h3 className="text-sm font-serif font-bold text-[#f5e4c6]">Reinforced Leather Rucksack</h3>
+                  <p className="text-[11px] text-stone-300 font-serif leading-tight mt-1">
+                    Olaf adds sturdy leather pouches and strap reinforcements (+5 Max Backpack Slots).
+                  </p>
+                </div>
+                <div className="pt-2">
+                  {getBackpackUpgradeCost() !== null ? (
+                    <>
+                      <div className="font-mono text-xs text-yellow-300 font-bold mb-1.5">
+                        Capacity: {hero.maxInventorySlots} ➔ {hero.maxInventorySlots + 5} Slots ({getBackpackUpgradeCost()} Gold)
+                      </div>
+                      <button
+                        id="btn-upgrade-backpack"
+                        disabled={hero.gold < getBackpackUpgradeCost()!}
+                        onClick={handleUpgradeBackpack}
+                        className="w-full py-1.5 bg-gradient-to-b from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-amber-100 font-serif font-bold text-xs rounded border border-amber-500 shadow disabled:opacity-40 cursor-pointer"
+                      >
+                        Expand (+5 Slots) — {getBackpackUpgradeCost()}G
+                      </button>
+                    </>
+                  ) : (
+                    <div className="p-2 bg-[#120b07] border border-[#3b2716] rounded text-xs font-mono text-emerald-400 font-bold">
+                      ✓ Maximum Capacity Reached ({hero.maxInventorySlots} Slots)
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -20,10 +20,11 @@ import {
   Award,
   ChevronRight,
   AlertCircle,
+  AlertTriangle,
   Footprints,
   Check,
 } from 'lucide-react';
-import { CombatLogEntry, CombatState, GameItem, HeroCharacter, HeroSkill, Monster } from '../types/game';
+import { CombatLogEntry, CombatState, GameItem, HeroCharacter, HeroSkill, Monster, StatType } from '../types/game';
 import { ITEMS_DATABASE } from '../data/items';
 import { DiceVisualizer } from './DiceVisualizer';
 import { rollDice, getStatModifier, parseAndRollFormula, RollResult } from '../utils/dice';
@@ -111,12 +112,155 @@ export const CombatView: React.FC<CombatViewProps> = ({
   const conMod = getStatModifier(heroStats.CON);
   const intMod = getStatModifier(heroStats.INT);
   const lckMod = getStatModifier(heroStats.LCK);
+  
+  const fleeStatKey: StatType = dexMod >= lckMod ? 'DEX' : 'LCK';
   const fleeMod = Math.max(dexMod, lckMod);
 
   const primaryWeapon = hero.equipment.weapon;
+  const isFinesseOrRanged = Boolean(
+    primaryWeapon &&
+      (primaryWeapon.name.toLowerCase().includes('bow') ||
+        primaryWeapon.name.toLowerCase().includes('dagger') ||
+        primaryWeapon.name.toLowerCase().includes('stiletto') ||
+        primaryWeapon.name.toLowerCase().includes('rapier') ||
+        primaryWeapon.name.toLowerCase().includes('dart') ||
+        primaryWeapon.name.toLowerCase().includes('sling') ||
+        primaryWeapon.name.toLowerCase().includes('crossbow'))
+  );
+  const weaponStatKey: StatType = isFinesseOrRanged && dexMod >= strMod ? 'DEX' : 'STR';
+  const weaponStatMod = weaponStatKey === 'DEX' ? dexMod : strMod;
+  const weaponItemBonus = primaryWeapon?.bonusDamage || 0;
   const weaponFormula = primaryWeapon?.damageDice || '1d4';
-  const weaponBonus = (primaryWeapon?.bonusDamage || 0) + strMod;
-  const totalWeaponAtkMod = strMod + (primaryWeapon?.bonusDamage || 0);
+  const weaponBonus = weaponItemBonus + weaponStatMod;
+  const totalWeaponAtkMod = weaponStatMod + weaponItemBonus;
+  const weaponStatBreakdown = `${weaponStatMod >= 0 ? `+${weaponStatMod}` : weaponStatMod} ${weaponStatKey}${weaponItemBonus ? ` +${weaponItemBonus} Wpn` : ''}`;
+
+  // Helper to compute deep breakdown for any skill
+  const getSkillDetails = (skill: HeroSkill) => {
+    let statKey: StatType = 'STR';
+    if (skill.diceFormula?.includes('STR')) statKey = 'STR';
+    else if (skill.diceFormula?.includes('DEX')) statKey = 'DEX';
+    else if (skill.diceFormula?.includes('INT')) statKey = 'INT';
+    else if (skill.diceFormula?.includes('CON')) statKey = 'CON';
+    else if (skill.diceFormula?.includes('LCK')) statKey = 'LCK';
+    else if (['aimed_shot', 'multishot', 'sneak_attack', 'smoke_bomb', 'poison_blade', 'survival_instinct'].includes(skill.id)) statKey = 'DEX';
+    else if (['cleave', 'smite', 'holy_strike', 'shield_wall', 'bulwark', 'holy_blessing'].includes(skill.id)) statKey = 'STR';
+    else if (['magic_missile', 'pyroblast', 'mana_shield'].includes(skill.id)) statKey = 'INT';
+    else if (['heal_prayer', 'second_wind', 'lay_on_hands'].includes(skill.id)) statKey = 'CON';
+    else if (hero.classId === 'wizard') statKey = 'INT';
+    else if (hero.classId === 'ranger' || hero.classId === 'rogue') statKey = 'DEX';
+    else if (hero.classId === 'cleric') statKey = 'CON';
+
+    const statMod = getStatModifier(heroStats[statKey]);
+
+    let extraAccuracy = 0;
+    let extraAccuracyLabel = '';
+    let isAutoHit = false;
+
+    if (skill.id === 'aimed_shot') {
+      extraAccuracy = 2;
+      extraAccuracyLabel = '+2 Aim';
+    } else if (skill.id === 'sneak_attack') {
+      extraAccuracy = 1;
+      extraAccuracyLabel = '+1 Stealth';
+    } else if (skill.id === 'magic_missile') {
+      isAutoHit = true;
+    }
+
+    const totalAtkMod = statMod + extraAccuracy;
+
+    // Parse base dice from formula
+    const match = skill.diceFormula?.match(/^(\d+d\d+)/i);
+    const baseDice = match ? match[1] : (skill.diceFormula || '1d8');
+
+    let damageBonus = statMod;
+    let damageBreakdown = `${statMod >= 0 ? `+${statMod}` : statMod} ${statKey}`;
+
+    if (skill.id === 'cleave' || skill.id === 'holy_strike') {
+      damageBonus = statMod + weaponItemBonus;
+      damageBreakdown = `${statMod >= 0 ? `+${statMod}` : statMod} ${statKey}${weaponItemBonus ? ` +${weaponItemBonus} Wpn` : ''}`;
+    } else if (skill.id === 'smite') {
+      damageBonus = statMod + weaponItemBonus;
+      damageBreakdown = `${statMod >= 0 ? `+${statMod}` : statMod} ${statKey}${weaponItemBonus ? ` +${weaponItemBonus} Wpn` : ''} +1d6 Holy`;
+    }
+
+    let rollSubtitle = '';
+    let boxLabel = 'Damage';
+    let boxText = '';
+
+    if (skill.type === 'heal') {
+      boxLabel = 'Healing';
+      if (skill.id === 'lay_on_hands') {
+        rollSubtitle = `Heals Flat +15 HP (Sacred Vitality) • Target Self`;
+        boxText = `Flat +15 HP • Restores Hit Points (Max ${hero.maxHp} HP)`;
+      } else {
+        rollSubtitle = `Heals: ${baseDice} ${statMod >= 0 ? `+ ${statMod}` : statMod} (${statMod >= 0 ? `+${statMod}` : statMod} ${statKey}) • Target Self`;
+        boxText = `${baseDice} ${statMod >= 0 ? `+ ${statMod}` : statMod} (${statMod >= 0 ? `+${statMod}` : statMod} ${statKey}) • Restores Hit Points (Max ${hero.maxHp} HP)`;
+      }
+    } else if (skill.type === 'buff') {
+      boxLabel = 'Effect';
+      if (skill.id === 'survival_instinct') {
+        rollSubtitle = `Defensive Ward (+4 AC & +15% Crit)`;
+        boxText = `+4 AC & +15% Critical Strike Chance for 3 turns • Sharpens senses`;
+      } else if (skill.id === 'shield_wall') {
+        rollSubtitle = `Defensive Ward (+4 AC & 3 Dmg Absorb)`;
+        boxText = `+4 AC & absorbs 3 incoming monster damage for 2 turns • Iron guard`;
+      } else if (skill.id === 'smoke_bomb') {
+        rollSubtitle = `Smoke Screen (+75% Evasion Chance)`;
+        boxText = `75% Dodge evasion chance against monster's next attack • Tactical smoke`;
+      } else if (skill.id === 'poison_blade') {
+        rollSubtitle = `Viper Venom (+1d6 Poison DoT)`;
+        boxText = `Weapon attacks coat foe in venom dealing 1d6 poison damage per turn`;
+      } else if (skill.id === 'mana_shield') {
+        rollSubtitle = `Mana Barrier (Absorbs 20 Dmg)`;
+        boxText = `Mystic barrier absorbs up to 20 incoming damage before depleting`;
+      } else if (skill.id === 'holy_blessing') {
+        rollSubtitle = `Divine Favor (+3 Atk & Saves)`;
+        boxText = `+3 bonus to all d20 attack rolls and saving throws for 3 turns`;
+      } else if (skill.id === 'bulwark') {
+        rollSubtitle = `Aura Barrier (-4 All Incoming Dmg)`;
+        boxText = `Radiates holy aura reducing all incoming damage by 4 for 3 turns`;
+      } else {
+        rollSubtitle = `Defensive Ward (+4 AC)`;
+        boxText = skill.description;
+      }
+    } else {
+      boxLabel = 'Damage';
+      if (isAutoHit) {
+        rollSubtitle = `Guaranteed Hit (${statMod >= 0 ? `+${statMod}` : statMod} ${statKey} Force) vs AC ${monster.armorClass}`;
+      } else {
+        const modBreakdown = `${statMod >= 0 ? `+${statMod}` : statMod} ${statKey}${extraAccuracyLabel ? ` ${extraAccuracyLabel}` : ''}`;
+        rollSubtitle = `Roll: 1d20 ${totalAtkMod >= 0 ? `+ ${totalAtkMod}` : totalAtkMod} (${modBreakdown}) vs AC ${monster.armorClass}`;
+      }
+
+      let flavor = 'Special Attack';
+      if (skill.id === 'aimed_shot') flavor = 'Precision Vital Strike';
+      else if (skill.id === 'multishot') flavor = '3x Rapid Arrow Barrage';
+      else if (skill.id === 'sneak_attack') flavor = 'Double Crit Threat Strike';
+      else if (skill.id === 'magic_missile') flavor = 'Unerring Force (Never Misses)';
+      else if (skill.id === 'pyroblast') flavor = 'Roaring Fire Blast';
+      else if (skill.id === 'cleave') flavor = 'Sweeping Heavy Cleave';
+      else if (skill.id === 'smite') flavor = 'Radiant Solar Smite';
+      else if (skill.id === 'holy_strike') flavor = 'Disciplined Crusader Blow';
+
+      boxText = `${baseDice} ${damageBonus >= 0 ? `+ ${damageBonus}` : damageBonus} (${damageBreakdown}) • ${flavor}`;
+    }
+
+    return {
+      statKey,
+      statMod,
+      extraAccuracy,
+      extraAccuracyLabel,
+      totalAtkMod,
+      isAutoHit,
+      baseDice,
+      damageBonus,
+      damageBreakdown,
+      rollSubtitle,
+      boxLabel,
+      boxText,
+    };
+  };
 
   // Helper to add combat log
   const addLog = (
@@ -144,11 +288,23 @@ export const CombatView: React.FC<CombatViewProps> = ({
     setCombatStep('HERO_ATTACK_ROLLING');
     sounds.playDiceRoll();
 
-    const atkRoll = rollDice(1, 20, totalWeaponAtkMod);
+    const staggerBonus = combat.monsterStumbled ? 2 : 0;
+    if (combat.monsterStumbled) {
+      combat.monsterStumbled = false;
+      onUpdateCombat({ ...combat });
+    }
+
+    const atkRoll = rollDice(1, 20, totalWeaponAtkMod + staggerBonus);
     setCurrentRoll(atkRoll);
 
     setTimeout(() => {
       const isHit = atkRoll.isCrit || (!atkRoll.isFumble && atkRoll.total >= monster.armorClass);
+      
+      if (atkRoll.isFumble) {
+        combat.heroStumbled = true;
+        onUpdateCombat({ ...combat });
+      }
+
       setPendingAttack({
         type: 'weapon',
         name: primaryWeapon?.name || 'Unarmed Strike',
@@ -163,16 +319,20 @@ export const CombatView: React.FC<CombatViewProps> = ({
       if (!isHit) {
         sounds.playBlock();
         setActionSummary({
-          title: atkRoll.isFumble ? 'CRITICAL FUMBLE!' : 'ATTACK MISSED',
-          details: `Attack Roll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (STR + Weapon) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. The blow failed to penetrate!`,
+          title: atkRoll.isFumble ? 'CRITICAL FUMBLE! (Natural 1)' : 'ATTACK MISSED',
+          details: atkRoll.isFumble
+            ? `Attack Roll: [1] (Natural 1 Fumble!) ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}${staggerBonus ? ' +2 Staggered' : ''}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}.\n\n💥 STUMBLED & VULNERABLE: You overextended and lost your balance! You FORFEIT your next combat turn while recovering your stance, giving ${monster.name} a free round to strike!`
+            : `Attack Roll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}${staggerBonus ? ' +2 Staggered' : ''}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. The blow failed to penetrate!`,
           isHit: false,
           isFumble: atkRoll.isFumble,
           type: 'hero',
         });
         addLog(
           'hero',
-          `Attack with ${primaryWeapon?.name || 'Weapon'} (Miss)`,
-          `Rolled [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${monster.armorClass}. Missed!`,
+          atkRoll.isFumble ? `Attack Fumble (Natural 1)` : `Attack with ${primaryWeapon?.name || 'Weapon'} (Miss)`,
+          atkRoll.isFumble
+            ? `Rolled Natural 1! Critical Fumble — Hero is stumbled and forfeits next turn!`
+            : `Rolled [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${monster.armorClass}. Missed!`,
           {
             diceType: 'd20',
             rolls: atkRoll.individualRolls,
@@ -185,8 +345,10 @@ export const CombatView: React.FC<CombatViewProps> = ({
       } else {
         sounds.playHit();
         setActionSummary({
-          title: atkRoll.isCrit ? 'CRITICAL HIT!' : 'ATTACK HIT!',
-          details: `Attack Roll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (STR + Weapon) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. Strike connected! Proceed to roll damage dice.`,
+          title: atkRoll.isCrit ? 'CRITICAL HIT! (Natural 20)' : 'ATTACK HIT!',
+          details: atkRoll.isCrit
+            ? `Attack Roll: [20] (Natural 20 Critical!) ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}${staggerBonus ? ' +2 Staggered' : ''}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}.\n\n⚔️ CRITICAL STRIKE: Maximum penetration! Your upcoming damage roll will be DOUBLED (2x Damage Multiplier + 3 Brutal Strike Bonus)!`
+            : `Attack Roll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}${staggerBonus ? ' +2 Staggered' : ''}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. Strike connected! Proceed to roll damage dice.`,
           isHit: true,
           isCrit: atkRoll.isCrit,
           type: 'hero',
@@ -205,10 +367,14 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
     setTimeout(() => {
       const dmgRes = parseAndRollFormula(pendingAttack.damageFormula, heroStats, pendingAttack.damageBonus);
-      let dmg = dmgRes.total;
+      const baseDmg = dmgRes.total;
+      let dmg = baseDmg;
 
       if (pendingAttack.isCrit) {
-        dmg = dmg * 2 + 3;
+        // Critical Hit Effect: Double Damage + 3 Brutal Strike Bonus
+        const critMultiplier = 2;
+        const brutalBonus = 3;
+        dmg = baseDmg * critMultiplier + brutalBonus;
         sounds.playCriticalHit();
         hero.statsHistory.critsRolled += 1;
       } else {
@@ -223,7 +389,9 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
       setActionSummary({
         title: pendingAttack.isCrit ? 'CRITICAL HIT & DAMAGE!' : 'DAMAGE DEALT!',
-        details: `Hit with ${pendingAttack.name}! Damage Dice: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} = ${dmg} damage dealt to ${monster.name}.`,
+        details: pendingAttack.isCrit
+          ? `Hit with ${pendingAttack.name}! Base Dice: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} = ${baseDmg} Base Damage.\n\n⚔️ CRITICAL MULTIPLIER APPLIED: [${baseDmg} Base × 2 (Critical Multiplier) + 3 (Brutal Strike Bonus)] = ${dmg} Total Damage dealt to ${monster.name}!`
+          : `Hit with ${pendingAttack.name}! Damage Dice: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} = ${dmg} damage dealt to ${monster.name}.`,
         damage: dmg,
         isHit: true,
         isCrit: pendingAttack.isCrit,
@@ -232,8 +400,10 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
       addLog(
         'hero',
-        `Hit with ${pendingAttack.name}`,
-        `Attack roll ${pendingAttack.atkRoll.total} vs AC ${monster.armorClass}. Dealt ${dmg} damage (${dmgRes.formulaString}).`,
+        pendingAttack.isCrit ? `Critical Hit with ${pendingAttack.name}` : `Hit with ${pendingAttack.name}`,
+        pendingAttack.isCrit
+          ? `CRITICAL HIT! Rolled ${baseDmg} base damage. Applied 2x Multiplier + 3 Brutal = ${dmg} total damage!`
+          : `Attack roll ${pendingAttack.atkRoll.total} vs AC ${monster.armorClass}. Dealt ${dmg} damage (${dmgRes.formulaString}).`,
         {
           diceType: 'd20',
           rolls: pendingAttack.atkRoll.individualRolls,
@@ -255,6 +425,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
   const handleHeroCastSkill = (skill: HeroSkill) => {
     if (combatStep !== 'HERO_CHOICE' || hero.currentMana < skill.manaCost) return;
     hero.currentMana -= skill.manaCost;
+    const detail = getSkillDetails(skill);
 
     if (skill.type === 'heal') {
       setCombatStep('HERO_ATTACK_ROLLING');
@@ -269,7 +440,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
         setActionSummary({
           title: `${skill.name} Cast!`,
-          details: `Channeled divine restorative light! Rolled ${healRoll.formulaString} = ${healed} HP restored. Current HP: ${hero.currentHp} / ${hero.maxHp}.`,
+          details: `Channeled restorative light! Rolled ${healRoll.formulaString} = ${healed} HP restored. Current HP: ${hero.currentHp} / ${hero.maxHp}.`,
           type: 'hero',
         });
 
@@ -286,54 +457,85 @@ export const CombatView: React.FC<CombatViewProps> = ({
       sounds.playBlock();
       setActionSummary({
         title: `${skill.name} Activated!`,
-        details: `Raised protective warding barrier (+4 Armor Class & 3 Damage Absorbed) for this round!`,
+        details: detail.boxText,
         type: 'hero',
       });
-      addLog('hero', skill.name, `Raised defense ward (+4 AC).`);
+      addLog('hero', skill.name, `Activated ${skill.name} (${detail.rollSubtitle}).`);
       onUpdateHero({ ...hero });
       onUpdateCombat({ ...combat });
       setCombatStep('HERO_NON_DAMAGE_RESULT');
       return;
     }
 
-    // Attack Spell (Two-Stage: To-Hit -> Damage)
+    // Attack Spell / Skill (Two-Stage: To-Hit -> Damage)
     setCombatStep('HERO_ATTACK_ROLLING');
     sounds.playMagic();
 
-    const spellAtkMod = intMod;
-    const spellRoll = rollDice(1, 20, spellAtkMod);
-    setCurrentRoll(spellRoll);
+    const staggerBonus = combat.monsterStumbled ? 2 : 0;
+    if (combat.monsterStumbled) {
+      combat.monsterStumbled = false;
+      onUpdateCombat({ ...combat });
+    }
+
+    const skillRoll = rollDice(1, 20, detail.totalAtkMod + staggerBonus);
+    if (detail.isAutoHit) {
+      skillRoll.isCrit = false;
+      skillRoll.isFumble = false;
+      skillRoll.total = Math.max(skillRoll.total, monster.armorClass);
+    }
+    setCurrentRoll(skillRoll);
 
     setTimeout(() => {
-      const isHit = spellRoll.isCrit || (!spellRoll.isFumble && spellRoll.total >= monster.armorClass);
+      const isHit = detail.isAutoHit || skillRoll.isCrit || (!skillRoll.isFumble && skillRoll.total >= monster.armorClass);
+      
+      if (skillRoll.isFumble && !detail.isAutoHit) {
+        combat.heroStumbled = true;
+        onUpdateCombat({ ...combat });
+      }
+
       setPendingAttack({
         type: 'spell',
         name: skill.name,
-        atkRoll: spellRoll,
+        atkRoll: skillRoll,
         isHit,
-        isCrit: spellRoll.isCrit,
-        isFumble: spellRoll.isFumble,
-        damageFormula: skill.diceFormula || '2d6+INT',
-        damageBonus: intMod,
+        isCrit: skillRoll.isCrit,
+        isFumble: skillRoll.isFumble,
+        damageFormula: detail.baseDice,
+        damageBonus: detail.damageBonus,
         skill,
       });
+
+      const statBreakdown = `${detail.statMod >= 0 ? `+${detail.statMod}` : detail.statMod} ${detail.statKey}${detail.extraAccuracyLabel ? ` ${detail.extraAccuracyLabel}` : ''}${staggerBonus ? ' +2 Staggered' : ''}`;
 
       if (!isHit) {
         sounds.playBlock();
         setActionSummary({
-          title: `${skill.name} Fizzled`,
-          details: `Spell Roll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (INT) = ${spellRoll.total} vs AC ${monster.armorClass}. Deflected by monster wards!`,
+          title: skillRoll.isFumble ? `${skill.name} Critical Fumble! (Natural 1)` : `${skill.name} Missed / Evaded`,
+          details: skillRoll.isFumble
+            ? `Attack Roll: [1] (Natural 1 Fumble!) ${skillRoll.modifier >= 0 ? `+ ${skillRoll.modifier}` : skillRoll.modifier} (${statBreakdown}) = ${skillRoll.total} vs AC ${monster.armorClass}.\n\n💥 STUMBLED & VULNERABLE: The ability completely backfired! You lost your footing and FORFEIT your next combat turn while recovering balance!`
+            : `Attack Roll: [${skillRoll.individualRolls[0]}] ${skillRoll.modifier >= 0 ? `+ ${skillRoll.modifier}` : skillRoll.modifier} (${statBreakdown}) = ${skillRoll.total} vs AC ${monster.armorClass}. Deflected by monster defenses!`,
           isHit: false,
+          isFumble: skillRoll.isFumble,
           type: 'hero',
         });
-        addLog('hero', `${skill.name} (Fizzle)`, `Spell failed to penetrate AC ${monster.armorClass}.`);
+        addLog(
+          'hero',
+          skillRoll.isFumble ? `${skill.name} (Fumble)` : `${skill.name} (Miss)`,
+          skillRoll.isFumble
+            ? `Rolled Natural 1 on ${skill.name}! Hero stumbled and forfeits next turn!`
+            : `Failed to penetrate AC ${monster.armorClass} (Rolled ${skillRoll.total}).`
+        );
       } else {
         sounds.playFire();
         setActionSummary({
-          title: spellRoll.isCrit ? `CRITICAL ${skill.name.toUpperCase()}!` : `${skill.name} Connected!`,
-          details: `Spell Roll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (INT) = ${spellRoll.total} vs AC ${monster.armorClass}. Spell penetrated wards! Proceed to roll damage dice.`,
+          title: skillRoll.isCrit ? `CRITICAL ${skill.name.toUpperCase()}! (Natural 20)` : `${skill.name} Connected!`,
+          details: detail.isAutoHit
+            ? `Unerring Arcane strike automatically hit monster for full effect! Proceed to roll damage.`
+            : skillRoll.isCrit
+            ? `Attack Roll: [20] (Natural 20 Critical!) ${skillRoll.modifier >= 0 ? `+ ${skillRoll.modifier}` : skillRoll.modifier} (${statBreakdown}) = ${skillRoll.total} vs AC ${monster.armorClass}.\n\n⚔️ CRITICAL STRIKE: Devastating direct hit! Your upcoming damage roll will be DOUBLED (2x Damage Multiplier + 3 Brutal Strike Bonus)!`
+            : `Attack Roll: [${skillRoll.individualRolls[0]}] ${skillRoll.modifier >= 0 ? `+ ${skillRoll.modifier}` : skillRoll.modifier} (${statBreakdown}) = ${skillRoll.total} vs AC ${monster.armorClass}. Hit connected! Proceed to roll damage dice.`,
           isHit: true,
-          isCrit: spellRoll.isCrit,
+          isCrit: skillRoll.isCrit,
           type: 'hero',
         });
       }
@@ -370,7 +572,19 @@ export const CombatView: React.FC<CombatViewProps> = ({
     setCurrentRoll(fleeRoll);
 
     setTimeout(() => {
-      if (fleeRoll.total >= escapeDc) {
+      if (fleeRoll.isFumble) {
+        sounds.playTrap();
+        combat.heroStumbled = true;
+        setActionSummary({
+          title: '✖ CRITICAL FUMBLE! ESCAPE BOTCHED (Natural 1)!',
+          details: `Flee Check: Rolled [1] (Natural 1 Fumble!) ${fleeRoll.modifier >= 0 ? `+ ${fleeRoll.modifier}` : fleeRoll.modifier} = ${fleeRoll.total} vs Escape DC ${escapeDc}.\n\n💥 STUMBLED & VULNERABLE: You tripped on the flagstones while fleeing! You FORFEIT your next combat turn while scrambling back to your feet! (Fate cannot avert a Critical Fumble!)`,
+          type: 'flee',
+          isHit: false,
+          isFumble: true,
+        });
+        addLog('hero', 'Flee Fumbled (Natural 1)', `Rolled Natural 1! Hero tripped and is stumbled!`);
+        setCombatStep('HERO_NON_DAMAGE_RESULT');
+      } else if (fleeRoll.total >= escapeDc) {
         // Success!
         sounds.playLoot();
         setActionSummary({
@@ -378,6 +592,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
           details: `Flee Check: Rolled [${fleeRoll.individualRolls[0]}] ${fleeRoll.modifier >= 0 ? `+ ${fleeRoll.modifier}` : fleeRoll.modifier} = ${fleeRoll.total} vs Escape DC ${escapeDc}. You retreated safely to the previous chamber!`,
           type: 'flee',
           isHit: true,
+          isFumble: false,
         });
         addLog('hero', 'Escaped', `Fled combat successfully (DC ${escapeDc}).`);
         setCombatStep('FLEE_RESULT');
@@ -389,6 +604,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
           details: `Flee Check: Rolled [${fleeRoll.individualRolls[0]}] ${fleeRoll.modifier >= 0 ? `+ ${fleeRoll.modifier}` : fleeRoll.modifier} = ${fleeRoll.total} vs Escape DC ${escapeDc}. ${monster.name} blocks your escape!`,
           type: 'flee',
           isHit: false,
+          isFumble: false,
         });
         addLog('hero', 'Flee Failed', `Failed to escape DC ${escapeDc}.`);
         setCombatStep('HERO_NON_DAMAGE_RESULT');
@@ -396,13 +612,107 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }, 600);
   };
 
-  // 6. USE POTION / CONSUMABLE IN COMBAT
+  // 6. USE POTION / CONSUMABLE / SCROLL IN COMBAT
   const handleUseCombatItem = (invIdx: number) => {
     const inv = hero.inventory[invIdx];
     if (!inv || !inv.item.usableInCombat) return;
     const item = inv.item;
 
-    if (item.healHp) {
+    // A. OFFENSIVE SPELL SCROLLS (e.g. Scroll of Fireball)
+    if (item.damageDice || item.id === 'scroll_of_fireball') {
+      if (inv.quantity > 1) {
+        inv.quantity -= 1;
+      } else {
+        hero.inventory.splice(invIdx, 1);
+      }
+
+      setCombatStep('HERO_DAMAGE_ROLLING');
+      sounds.playFire();
+
+      const intMod = getStatModifier(heroStats.INT);
+      const formula = item.damageDice || '3d8';
+      const dmgRes = parseAndRollFormula(formula, heroStats, intMod);
+      setDamageRoll(dmgRes);
+
+      setPendingAttack({
+        type: 'spell',
+        name: item.name,
+        damageFormula: formula,
+        damageBonus: intMod,
+        atkRoll: rollDice(1, 20, 0),
+        isHit: true,
+        isCrit: false,
+        isFumble: false,
+      });
+
+      setTimeout(() => {
+        const dmg = Math.max(1, dmgRes.total);
+        hero.statsHistory.highestDamageDealt = Math.max(hero.statsHistory.highestDamageDealt, dmg);
+        monster.hp = Math.max(0, monster.hp - dmg);
+        sounds.playFire();
+
+        setActionSummary({
+          title: `🔥 ${item.name.toUpperCase()} BLAST!`,
+          details: `You unfurled the enchanted parchment and unleashed a searing blaze upon ${monster.name}!\n\nDamage Roll: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} (${intMod >= 0 ? `+${intMod}` : intMod} INT Power) = ${dmg} Fire Damage dealt!`,
+          damage: dmg,
+          isHit: true,
+          isCrit: false,
+          type: 'hero',
+        });
+
+        addLog(
+          'hero',
+          `Cast ${item.name}`,
+          `Unfurled ${item.name} blasting ${monster.name} for ${dmg} Fire Damage (${dmgRes.formulaString}).`,
+          {
+            diceType: 'd8',
+            rolls: dmgRes.individualRolls,
+            modifier: dmgRes.modifier,
+            total: dmgRes.total,
+          },
+          dmg
+        );
+
+        onUpdateHero({ ...hero });
+        onUpdateCombat({ ...combat });
+        setCombatStep('HERO_DAMAGE_RESULT');
+      }, 600);
+      return;
+    }
+
+    // B. ESCAPE SCROLLS (e.g. Scroll of Escape)
+    if (item.id === 'scroll_of_teleport') {
+      if (inv.quantity > 1) {
+        inv.quantity -= 1;
+      } else {
+        hero.inventory.splice(invIdx, 1);
+      }
+      sounds.playMagic();
+      setActionSummary({
+        title: '✦ SCROLL OF ESCAPE TELEPORTATION!',
+        details: 'You unfurled the Scroll of Escape! A dimensional rift opens and instantly transports you safely out of combat back to the previous chamber.',
+        type: 'flee',
+        isHit: true,
+      });
+      addLog('hero', 'Used Scroll of Escape', 'Safely teleported out of combat back to the previous chamber.');
+      onUpdateHero({ ...hero });
+      onUpdateCombat({ ...combat });
+      setCombatStep('FLEE_RESULT');
+      return;
+    }
+
+    // C. RESTORATIVE POTIONS / CONSUMABLES (HP & Mana)
+    if (item.healHp && item.healMana) {
+      sounds.playHeal();
+      hero.currentHp = Math.min(hero.maxHp, hero.currentHp + item.healHp);
+      hero.currentMana = Math.min(hero.maxMana, hero.currentMana + item.healMana);
+      setActionSummary({
+        title: `Consumed ${item.name}!`,
+        details: `Restored ${item.healHp} HP and ${item.healMana} Mana! Current HP: ${hero.currentHp}/${hero.maxHp}, Mana: ${hero.currentMana}/${hero.maxMana}.`,
+        type: 'hero',
+      });
+      addLog('hero', `Used ${item.name}`, `Restored ${item.healHp} HP and ${item.healMana} Mana.`);
+    } else if (item.healHp) {
       sounds.playHeal();
       hero.currentHp = Math.min(hero.maxHp, hero.currentHp + item.healHp);
       setActionSummary({
@@ -420,6 +730,14 @@ export const CombatView: React.FC<CombatViewProps> = ({
         type: 'hero',
       });
       addLog('hero', `Used ${item.name}`, `Restored ${item.healMana} Mana.`);
+    } else {
+      sounds.playMagic();
+      setActionSummary({
+        title: `Used ${item.name}!`,
+        details: `Activated ${item.name}.`,
+        type: 'hero',
+      });
+      addLog('hero', `Used ${item.name}`, `Activated ${item.name}.`);
     }
 
     if (inv.quantity > 1) {
@@ -450,70 +768,106 @@ export const CombatView: React.FC<CombatViewProps> = ({
     setCurrentRoll(atkRoll);
 
     setTimeout(() => {
-      const isHit = atkRoll.isCrit || atkRoll.total >= heroAc;
-      let dmg = 0;
-
-      if (isHit) {
-        const dmgRes = parseAndRollFormula(action.damageDice);
-        dmg = dmgRes.total;
-        if (atkRoll.isCrit) {
-          dmg = Math.floor(dmg * 1.5) + 2;
-          sounds.playCriticalHit();
-        } else {
-          sounds.playHit();
-        }
-
-        if (combat.heroDefending) {
-          dmg = Math.max(1, dmg - 3);
-          sounds.playBlock();
-        }
-
-        hero.currentHp = Math.max(0, hero.currentHp - dmg);
-
-        setActionSummary({
-          title: `${monster.name} Struck You!`,
-          details: `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. You took ${dmg} damage!`,
-          damage: dmg,
-          isHit: true,
-          isCrit: atkRoll.isCrit,
-          type: 'monster',
-        });
-
-        addLog(
-          'monster',
-          `${monster.name}: ${action.name}`,
-          `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs your AC ${heroAc}. HIT for ${dmg} damage.`,
-          {
-            diceType: 'd20',
-            rolls: atkRoll.individualRolls,
-            modifier: atkRoll.modifier,
-            total: atkRoll.total,
-            targetValue: heroAc,
-            isCrit: atkRoll.isCrit,
-          },
-          dmg
-        );
-      } else {
+      // Monster Attack Evaluation
+      if (atkRoll.isFumble) {
+        // Monster Critical Fumble (Natural 1)
+        combat.monsterStumbled = true;
         sounds.playBlock();
+
         setActionSummary({
-          title: `${monster.name} Missed!`,
-          details: `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. The blow was deflected!`,
+          title: 'CRITICAL ENEMY FUMBLE! (Natural 1)',
+          details: `${monster.name} rolled a Natural 1 and slipped on the dungeon stones! The creature is STAGGERED and completely botched its attack, dealing 0 damage and leaving its guard wide open (+2 Advantage to your next attack roll)!`,
           isHit: false,
+          isFumble: true,
           type: 'monster',
         });
 
         addLog(
           'monster',
-          `${monster.name} Missed`,
-          `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs your AC ${heroAc}. Missed!`,
+          `${monster.name} Fumbled! (Natural 1)`,
+          `Rolled Natural 1! The attack backfired — ${monster.name} is staggered (+2 advantage to hero next turn).`,
           {
             diceType: 'd20',
             rolls: atkRoll.individualRolls,
             modifier: atkRoll.modifier,
             total: atkRoll.total,
             targetValue: heroAc,
+            isFumble: true,
           }
         );
+      } else {
+        const isHit = atkRoll.isCrit || atkRoll.total >= heroAc;
+        let dmg = 0;
+
+        if (isHit) {
+          const dmgRes = parseAndRollFormula(action.damageDice);
+          const baseDmg = dmgRes.total;
+          dmg = baseDmg;
+
+          if (atkRoll.isCrit) {
+            // Monster Critical Strike: 1.5x damage + 2 brutality
+            dmg = Math.floor(baseDmg * 1.5) + 2;
+            sounds.playCriticalHit();
+          } else {
+            sounds.playHit();
+          }
+
+          if (combat.heroDefending) {
+            dmg = Math.max(1, dmg - 3);
+            sounds.playBlock();
+          }
+
+          hero.currentHp = Math.max(0, hero.currentHp - dmg);
+
+          setActionSummary({
+            title: atkRoll.isCrit ? 'CRITICAL ENEMY STRIKE! (Natural 20)' : `${monster.name} Struck You!`,
+            details: atkRoll.isCrit
+              ? `${action.name}: Rolled [20] + ${atkRoll.modifier} = ${atkRoll.total} (NATURAL 20 CRITICAL!). Penetrated all defenses!\n\n💥 CRITICAL DAMAGE: [${baseDmg} Base × 1.5 + 2 Brutality] = ${dmg} damage dealt to you!`
+              : `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. You took ${dmg} damage!`,
+            damage: dmg,
+            isHit: true,
+            isCrit: atkRoll.isCrit,
+            type: 'monster',
+          });
+
+          addLog(
+            'monster',
+            atkRoll.isCrit ? `Critical Strike from ${monster.name}` : `${monster.name}: ${action.name}`,
+            atkRoll.isCrit
+              ? `NATURAL 20 CRITICAL! Struck with ${action.name} for ${dmg} critical damage!`
+              : `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs your AC ${heroAc}. HIT for ${dmg} damage.`,
+            {
+              diceType: 'd20',
+              rolls: atkRoll.individualRolls,
+              modifier: atkRoll.modifier,
+              total: atkRoll.total,
+              targetValue: heroAc,
+              isCrit: atkRoll.isCrit,
+            },
+            dmg
+          );
+        } else {
+          sounds.playBlock();
+          setActionSummary({
+            title: `${monster.name} Missed!`,
+            details: `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. The blow was deflected!`,
+            isHit: false,
+            type: 'monster',
+          });
+
+          addLog(
+            'monster',
+            `${monster.name} Missed`,
+            `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs your AC ${heroAc}. Missed!`,
+            {
+              diceType: 'd20',
+              rolls: atkRoll.individualRolls,
+              modifier: atkRoll.modifier,
+              total: atkRoll.total,
+              targetValue: heroAc,
+            }
+          );
+        }
       }
 
       combat.heroDefending = false;
@@ -526,20 +880,32 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
   // FATE REROLL HANDLERS
   const handleFateRerollHeroAttack = () => {
-    if (hero.rerollTokens <= 0 || !pendingAttack) return;
+    if (hero.rerollTokens <= 0 || !pendingAttack || pendingAttack.isFumble || pendingAttack.atkRoll.isFumble) return;
     hero.rerollTokens -= 1;
+    combat.heroStumbled = false;
     onUpdateHero({ ...hero });
     sounds.playDiceRoll();
 
     setCombatStep('HERO_ATTACK_ROLLING');
 
-    if (pendingAttack.type === 'spell') {
-      const spellAtkMod = intMod;
-      const spellRoll = rollDice(1, 20, spellAtkMod);
+    if (pendingAttack.type === 'spell' && pendingAttack.skill) {
+      const detail = getSkillDetails(pendingAttack.skill);
+      const spellRoll = rollDice(1, 20, detail.totalAtkMod);
+      if (detail.isAutoHit) {
+        spellRoll.isCrit = false;
+        spellRoll.isFumble = false;
+        spellRoll.total = Math.max(spellRoll.total, monster.armorClass);
+      }
       setCurrentRoll(spellRoll);
+      const statBreakdown = `${detail.statMod >= 0 ? `+${detail.statMod}` : detail.statMod} ${detail.statKey}${detail.extraAccuracyLabel ? ` ${detail.extraAccuracyLabel}` : ''}`;
 
       setTimeout(() => {
-        const isHit = spellRoll.isCrit || (!spellRoll.isFumble && spellRoll.total >= monster.armorClass);
+        const isHit = detail.isAutoHit || spellRoll.isCrit || (!spellRoll.isFumble && spellRoll.total >= monster.armorClass);
+        if (spellRoll.isFumble && !detail.isAutoHit) {
+          combat.heroStumbled = true;
+          onUpdateCombat({ ...combat });
+        }
+
         setPendingAttack({
           ...pendingAttack,
           atkRoll: spellRoll,
@@ -551,17 +917,22 @@ export const CombatView: React.FC<CombatViewProps> = ({
         if (!isHit) {
           sounds.playBlock();
           setActionSummary({
-            title: `${pendingAttack.name} Fizzled (Fate Reroll)`,
-            details: `Fate Reroll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (INT) = ${spellRoll.total} vs AC ${monster.armorClass}. Deflected by monster wards!`,
+            title: spellRoll.isFumble ? `${pendingAttack.name} Critical Fumble (Fate Reroll)!` : `${pendingAttack.name} Missed (Fate Reroll)`,
+            details: spellRoll.isFumble
+              ? `Fate Reroll: [1] (Natural 1 Fumble!) ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (${statBreakdown}) = ${spellRoll.total} vs AC ${monster.armorClass}.\n\n💥 STUMBLED & VULNERABLE: Botched the spell on reroll and lost balance! You FORFEIT your next combat turn!`
+              : `Fate Reroll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (${statBreakdown}) = ${spellRoll.total} vs AC ${monster.armorClass}. Deflected by monster defenses!`,
             isHit: false,
+            isFumble: spellRoll.isFumble,
             type: 'hero',
           });
-          addLog('hero', `${pendingAttack.name} (Fate Reroll Fizzle)`, `Spell failed to penetrate AC ${monster.armorClass}.`);
+          addLog('hero', `${pendingAttack.name} (Fate Reroll Miss)`, `Spell failed to penetrate AC ${monster.armorClass}.`);
         } else {
           sounds.playFire();
           setActionSummary({
             title: spellRoll.isCrit ? `CRITICAL ${pendingAttack.name.toUpperCase()} (FATE REROLL)!` : `${pendingAttack.name} Connected (Fate Reroll)!`,
-            details: `Fate Reroll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (INT) = ${spellRoll.total} vs AC ${monster.armorClass}. Spell penetrated wards! Proceed to roll damage dice.`,
+            details: spellRoll.isCrit
+              ? `Fate Reroll: [20] (Natural 20 Critical!) ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (${statBreakdown}) = ${spellRoll.total} vs AC ${monster.armorClass}.\n\n⚔️ CRITICAL STRIKE: Upcoming damage roll will be DOUBLED (2x Damage Multiplier + 3 Brutal Strike Bonus)!`
+              : `Fate Reroll: [${spellRoll.individualRolls[0]}] ${spellRoll.modifier >= 0 ? `+ ${spellRoll.modifier}` : spellRoll.modifier} (${statBreakdown}) = ${spellRoll.total} vs AC ${monster.armorClass}. Strike connected! Proceed to roll damage dice.`,
             isHit: true,
             isCrit: spellRoll.isCrit,
             type: 'hero',
@@ -575,6 +946,11 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
       setTimeout(() => {
         const isHit = atkRoll.isCrit || (!atkRoll.isFumble && atkRoll.total >= monster.armorClass);
+        if (atkRoll.isFumble) {
+          combat.heroStumbled = true;
+          onUpdateCombat({ ...combat });
+        }
+
         setPendingAttack({
           ...pendingAttack,
           atkRoll,
@@ -587,7 +963,9 @@ export const CombatView: React.FC<CombatViewProps> = ({
           sounds.playBlock();
           setActionSummary({
             title: atkRoll.isFumble ? 'CRITICAL FUMBLE (FATE REROLL)!' : 'ATTACK MISSED (FATE REROLL)',
-            details: `Fate Reroll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (STR + Weapon) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. The blow failed to penetrate!`,
+            details: atkRoll.isFumble
+              ? `Fate Reroll: [1] (Natural 1 Fumble!) ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}.\n\n💥 STUMBLED & VULNERABLE: Overextended on reroll! You FORFEIT your next combat turn!`
+              : `Fate Reroll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. The blow failed to penetrate!`,
             isHit: false,
             isFumble: atkRoll.isFumble,
             type: 'hero',
@@ -609,7 +987,9 @@ export const CombatView: React.FC<CombatViewProps> = ({
           sounds.playHit();
           setActionSummary({
             title: atkRoll.isCrit ? 'CRITICAL HIT (FATE REROLL)!' : 'ATTACK HIT (FATE REROLL)!',
-            details: `Fate Reroll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (STR + Weapon) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. Strike connected! Proceed to roll damage dice.`,
+            details: atkRoll.isCrit
+              ? `Fate Reroll: [20] (Natural 20 Critical!) ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}.\n\n⚔️ CRITICAL STRIKE: Upcoming damage roll will be DOUBLED (2x Damage Multiplier + 3 Brutal Strike Bonus)!`
+              : `Fate Reroll: [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} (${weaponStatBreakdown}) = ${atkRoll.total} vs Enemy AC ${monster.armorClass}. Strike connected! Proceed to roll damage dice.`,
             isHit: true,
             isCrit: atkRoll.isCrit,
             type: 'hero',
@@ -633,10 +1013,11 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
     setTimeout(() => {
       const dmgRes = parseAndRollFormula(pendingAttack.damageFormula, heroStats, pendingAttack.damageBonus);
-      let dmg = dmgRes.total;
+      const baseDmg = dmgRes.total;
+      let dmg = baseDmg;
 
       if (pendingAttack.isCrit) {
-        dmg = dmg * 2 + 3;
+        dmg = baseDmg * 2 + 3;
         sounds.playCriticalHit();
       } else {
         if (pendingAttack.type === 'spell') sounds.playFire();
@@ -650,7 +1031,9 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
       setActionSummary({
         title: pendingAttack.isCrit ? 'CRITICAL HIT & DAMAGE (FATE REROLL)!' : 'DAMAGE DEALT (FATE REROLL)!',
-        details: `Fate Reroll Damage Dice: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} = ${dmg} damage dealt to ${monster.name}.`,
+        details: pendingAttack.isCrit
+          ? `Fate Reroll Base Dice: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} = ${baseDmg} Base Damage.\n\n⚔️ CRITICAL MULTIPLIER APPLIED: [${baseDmg} Base × 2 (Critical Multiplier) + 3 (Brutal Strike Bonus)] = ${dmg} Total Damage dealt to ${monster.name}!`
+          : `Fate Reroll Damage Dice: ${dmgRes.formulaString} (${dmgRes.individualRolls.join(' + ')}) ${dmgRes.modifier >= 0 ? `+ ${dmgRes.modifier}` : dmgRes.modifier} = ${dmg} damage dealt to ${monster.name}.`,
         damage: dmg,
         isHit: true,
         isCrit: pendingAttack.isCrit,
@@ -660,7 +1043,9 @@ export const CombatView: React.FC<CombatViewProps> = ({
       addLog(
         'hero',
         `Fate Reroll Damage on ${pendingAttack.name}`,
-        `New damage rolled: ${dmg} (${dmgRes.formulaString}).`,
+        pendingAttack.isCrit
+          ? `CRITICAL REROLL! Rolled ${baseDmg} base damage. Applied 2x Multiplier + 3 Brutal = ${dmg} total damage!`
+          : `New damage rolled: ${dmg} (${dmgRes.formulaString}).`,
         undefined,
         dmg
       );
@@ -671,8 +1056,16 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }, 600);
   };
 
+  const handleHeroRecoverStumble = () => {
+    combat.heroStumbled = false;
+    sounds.playTrap();
+    addLog('hero', 'Recovered Balance (Turn Forfeited)', `Spent turn regaining footing after Critical Fumble. Turn skipped!`);
+    onUpdateCombat({ ...combat });
+    handleProceedToEnemyTurn();
+  };
+
   const handleFateRerollFlee = () => {
-    if (hero.rerollTokens <= 0) return;
+    if (hero.rerollTokens <= 0 || actionSummary?.isFumble) return;
     hero.rerollTokens -= 1;
     onUpdateHero({ ...hero });
     sounds.playDiceRoll();
@@ -1001,6 +1394,18 @@ export const CombatView: React.FC<CombatViewProps> = ({
                 </div>
               </div>
 
+              {/* Rules summary banner for Critical Outcomes */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] font-mono px-3 py-1.5 bg-[#140f0a] rounded-lg border border-amber-900/50 text-stone-300 shadow-inner">
+                <div className="flex items-center gap-1.5 text-yellow-300">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                  <span><strong>Crit Hit (Nat 20):</strong> 2x Damage Multiplier + 3 Brutal Strike</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-red-300">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <span><strong>Crit Fumble (Nat 1):</strong> Stumbled & forfeit next turn (No Fate Rerolls)</span>
+                </div>
+              </div>
+
               {/* Action Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Attack with Weapon */}
@@ -1018,14 +1423,13 @@ export const CombatView: React.FC<CombatViewProps> = ({
                         Attack with {primaryWeapon?.name || 'Bare Fists'}
                       </div>
                       <div className="text-[11px] text-amber-400/90 font-mono mt-0.5">
-                        Roll: 1d20 {totalWeaponAtkMod >= 0 ? `+ ${totalWeaponAtkMod}` : totalWeaponAtkMod} vs AC {monster.armorClass}
+                        Roll: 1d20 {totalWeaponAtkMod >= 0 ? `+ ${totalWeaponAtkMod}` : totalWeaponAtkMod} ({weaponStatBreakdown}) vs AC {monster.armorClass}
                       </div>
                     </div>
                   </div>
                   <div className="w-full bg-[#130d08] p-1.5 rounded border border-[#3b2716] text-[10px] font-mono text-stone-300">
                     <span className="text-amber-400 font-bold">Damage:</span> {weaponFormula}{' '}
-                    {weaponBonus >= 0 ? `+ ${weaponBonus}` : weaponBonus} ({strMod >= 0 ? `+${strMod}` : strMod} STR
-                    {primaryWeapon?.bonusDamage ? ` +${primaryWeapon.bonusDamage} Wpn` : ''})
+                    {weaponBonus >= 0 ? `+ ${weaponBonus}` : weaponBonus} ({weaponStatBreakdown}) • Threat 20 (x2 Crit)
                   </div>
                 </button>
 
@@ -1049,15 +1453,14 @@ export const CombatView: React.FC<CombatViewProps> = ({
                     </div>
                   </div>
                   <div className="w-full bg-[#0d121a] p-1.5 rounded border border-[#1d2b40] text-[10px] font-mono text-stone-300">
-                    <span className="text-blue-300 font-bold">Effect:</span> Absorbs 3 damage from monster attacks this turn.
+                    <span className="text-blue-300 font-bold">Effect:</span> Absorbs {3 + (hero.equipment.shield?.armorBonus || 0)} damage (+3 Guard{hero.equipment.shield?.armorBonus ? ` +${hero.equipment.shield.armorBonus} Shield` : ''}) from monster attacks this turn.
                   </div>
                 </button>
 
                 {/* 3. Hero Spells & Class Skills */}
                 {hero.skills.map((skill) => {
                   const canAfford = hero.currentMana >= skill.manaCost;
-                  const isHeal = skill.type === 'heal';
-                  const isBuff = skill.type === 'buff';
+                  const detail = getSkillDetails(skill);
 
                   return (
                     <button
@@ -1083,16 +1486,12 @@ export const CombatView: React.FC<CombatViewProps> = ({
                             </span>
                           </div>
                           <div className="text-[11px] text-purple-300/90 font-mono mt-0.5">
-                            {isHeal
-                              ? `Heals ${skill.diceFormula || '1d8+INT'}`
-                              : isBuff
-                              ? `Defensive Ward (+4 AC)`
-                              : `Roll: 1d20 ${intMod >= 0 ? `+ ${intMod}` : intMod} (INT) vs AC ${monster.armorClass}`}
+                            {detail.rollSubtitle}
                           </div>
                         </div>
                       </div>
                       <div className="w-full bg-[#140e1c] p-1.5 rounded border border-[#3b284f] text-[10px] font-mono text-stone-300">
-                        <span className="text-purple-300 font-bold">Effect:</span> {skill.description}
+                        <span className="text-purple-300 font-bold">{detail.boxLabel}:</span> {detail.boxText}
                       </div>
                     </button>
                   );
@@ -1113,12 +1512,12 @@ export const CombatView: React.FC<CombatViewProps> = ({
                         Attempt Tactical Escape
                       </div>
                       <div className="text-[11px] text-stone-400 font-mono mt-0.5">
-                        Roll: 1d20 {fleeMod >= 0 ? `+ ${fleeMod}` : fleeMod} (DEX/LCK) vs DC {10 + monster.level}
+                        Roll: 1d20 {fleeMod >= 0 ? `+ ${fleeMod}` : fleeMod} ({fleeMod >= 0 ? `+${fleeMod}` : fleeMod} {fleeStatKey}) vs DC {10 + monster.level}
                       </div>
                     </div>
                   </div>
                   <div className="w-full bg-[#14120f] p-1.5 rounded border border-[#38332a] text-[10px] font-mono text-stone-300">
-                    <span className="text-amber-300 font-bold">Flee Rule:</span> Retreats to safety if check passes.
+                    <span className="text-amber-300 font-bold">Flee Rule:</span> DC {10 + monster.level} (Base 10 + Lvl {monster.level} Monster) • Retreats safely to previous chamber.
                   </div>
                 </button>
               </div>
@@ -1146,6 +1545,12 @@ export const CombatView: React.FC<CombatViewProps> = ({
                         )}
                         {inv.item.healMana && (
                           <span className="text-[10px] font-mono text-cyan-400">(+{inv.item.healMana} MP)</span>
+                        )}
+                        {inv.item.damageDice && (
+                          <span className="text-[10px] font-mono text-orange-400">({inv.item.damageDice} Fire Dmg)</span>
+                        )}
+                        {inv.item.id === 'scroll_of_teleport' && (
+                          <span className="text-[10px] font-mono text-purple-400">(Instant Escape)</span>
                         )}
                       </button>
                     ))}
@@ -1199,9 +1604,36 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
               {/* Visual Attack Dice Breakdown */}
               <div className="p-4 bg-stone-900/80 rounded-lg border border-amber-900/60 space-y-2">
-                <div className="text-sm text-stone-200 leading-relaxed font-serif">
+                <div className="text-sm text-stone-200 leading-relaxed font-serif whitespace-pre-line">
                   {actionSummary.details}
                 </div>
+
+                {/* Explicit Critical Hit Banner */}
+                {pendingAttack.isCrit && (
+                  <div className="p-3 bg-gradient-to-r from-amber-950/90 via-yellow-950/90 to-amber-950/90 border-2 border-yellow-500 rounded-lg text-amber-200 text-xs font-serif space-y-1 shadow-lg">
+                    <div className="flex items-center gap-2 font-bold text-yellow-300">
+                      <Sparkles className="w-4 h-4 text-yellow-400 animate-pulse" />
+                      <span>CRITICAL HIT EFFECT ACTIVE (Natural 20)</span>
+                    </div>
+                    <p className="text-yellow-100/90">
+                      Your strike pierced armor cleanly! Upcoming damage roll will receive <strong>2x Double Damage Multiplier + 3 Brutal Strike Bonus</strong>!
+                    </p>
+                  </div>
+                )}
+
+                {/* Explicit Critical Fumble Warning Banner */}
+                {pendingAttack.isFumble && (
+                  <div className="p-3 bg-gradient-to-r from-red-950/90 via-amber-950/90 to-red-950/90 border-2 border-red-500 rounded-lg text-red-200 text-xs font-serif space-y-1 shadow-lg">
+                    <div className="flex items-center gap-2 font-bold text-red-300">
+                      <AlertTriangle className="w-4 h-4 text-red-400 animate-bounce" />
+                      <span>CRITICAL FUMBLE PENALTY (Natural 1 Rolled)</span>
+                    </div>
+                    <p className="text-red-100/90">
+                      You severely overextended and lost your footing! You are <strong>Off-Balance & Stumbled</strong>: you will <strong>FORFEIT your next combat turn</strong> while recovering your stance, allowing {monster.name} to strike freely! (A Critical Fumble cannot be rerolled with Fate)
+                    </p>
+                  </div>
+                )}
+
                 <div className="text-xs font-mono text-stone-400 bg-[#120d09] p-2.5 rounded border border-[#3b2718]">
                   <div className="flex justify-between mb-1">
                     <span>Target Armor Class (AC):</span>
@@ -1215,51 +1647,64 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   </div>
                   {pendingAttack.isHit && (
                     <div className="flex justify-between pt-1 border-t border-stone-800 text-amber-300">
-                      <span>Weapon Damage Dice to Roll:</span>
+                      <span>{pendingAttack.type === 'spell' ? 'Skill / Spell Damage Dice to Roll:' : 'Weapon Damage Dice to Roll:'}</span>
                       <span className="font-bold">
                         {pendingAttack.damageFormula}{' '}
                         {pendingAttack.damageBonus >= 0 ? `+ ${pendingAttack.damageBonus}` : pendingAttack.damageBonus}
+                        {pendingAttack.isCrit ? ' [×2 + 3 Brutal Crit]' : ''}
                       </span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Fate Reroll on Failed Attack */}
+              {/* Fate Reroll on Failed Attack (Blocked on Critical Fumbles) */}
               {!pendingAttack.isHit && (
-                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
-                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
-                      <span>Defy Fate & Alter Destiny</span>
+                pendingAttack.isFumble ? (
+                  <div className="p-3.5 bg-gradient-to-r from-red-950/70 via-[#210f0f] to-red-950/70 border-2 border-red-800/80 rounded-xl shadow-lg flex items-center gap-3 text-xs font-serif text-red-200">
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                    <div>
+                      <span className="font-bold text-red-300">Fate Cannot Alter a Critical Fumble (Natural 1):</span>
+                      <p className="text-red-300/80 text-[11px] mt-0.5 leading-relaxed">
+                        A Natural 1 represents an absolute, catastrophic blunder. Fate Rerolls cannot be spent to undo Critical Fumbles.
+                      </p>
                     </div>
-                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
-                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
-                    </span>
                   </div>
+                ) : (
+                  <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                        <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                        <span>Defy Fate & Alter Destiny</span>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                        {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                      </span>
+                    </div>
 
-                  <p className="text-xs text-purple-300/90 font-serif">
-                    Spend 1 Fate Reroll from your inventory to immediately re-roll this attack check.
-                  </p>
+                    <p className="text-xs text-purple-300/90 font-serif">
+                      Spend 1 Fate Reroll from your inventory to immediately re-roll this attack check.
+                    </p>
 
-                  <button
-                    id="btn-use-fate-reroll-attack"
-                    disabled={hero.rerollTokens <= 0}
-                    onClick={handleFateRerollHeroAttack}
-                    className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
-                      hero.rerollTokens > 0
-                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
-                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    <Dices className="w-4 h-4 text-purple-200" />
-                    <span>
-                      {hero.rerollTokens > 0
-                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available)`
-                        : 'No Fate Tokens in Inventory'}
-                    </span>
-                  </button>
-                </div>
+                    <button
+                      id="btn-use-fate-reroll-attack"
+                      disabled={hero.rerollTokens <= 0}
+                      onClick={handleFateRerollHeroAttack}
+                      className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                        hero.rerollTokens > 0
+                          ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                          : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <Dices className="w-4 h-4 text-purple-200" />
+                      <span>
+                        {hero.rerollTokens > 0
+                          ? `✦ Use Fate Reroll (${hero.rerollTokens} Available)`
+                          : 'No Fate Tokens in Inventory'}
+                      </span>
+                    </button>
+                  </div>
+                )
               )}
 
               {/* Progress Action Controls */}
@@ -1323,8 +1768,26 @@ export const CombatView: React.FC<CombatViewProps> = ({
                 )}
               </div>
 
-              <div className="p-4 bg-stone-900/80 rounded-lg border border-amber-900/60 text-sm text-stone-200 leading-relaxed font-serif">
-                {actionSummary.details}
+              <div className="p-4 bg-stone-900/80 rounded-lg border border-amber-900/60 text-sm text-stone-200 leading-relaxed font-serif space-y-2">
+                <div className="whitespace-pre-line">{actionSummary.details}</div>
+
+                {/* Explicit Critical Hit Damage Breakdown */}
+                {actionSummary.isCrit && (
+                  <div className="p-3 bg-gradient-to-r from-amber-950/90 via-yellow-950/80 to-amber-950/90 border-2 border-yellow-500/80 rounded-lg text-amber-200 text-xs font-serif space-y-1 shadow-md">
+                    <div className="flex items-center justify-between text-yellow-300 font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-yellow-400 animate-spin" />
+                        CRITICAL DAMAGE MULTIPLIER APPLIED
+                      </span>
+                      <span className="px-2 py-0.5 bg-yellow-950 border border-yellow-600 rounded text-yellow-200 font-mono text-[11px]">
+                        2x Multiplier + 3 Brutal Strike
+                      </span>
+                    </div>
+                    <p className="text-yellow-100/90 leading-relaxed font-sans">
+                      Base damage dice doubled and amplified by devastating kinetic momentum: <strong>[Base Roll × 2 + 3 Brutal Strike Bonus] = Total {actionSummary.damage} Damage!</strong>
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Progress Controls */}
@@ -1394,41 +1857,53 @@ export const CombatView: React.FC<CombatViewProps> = ({
                 {actionSummary.details}
               </div>
 
-              {/* Fate Reroll on Failed Flee */}
+              {/* Fate Reroll on Failed Flee (Blocked on Critical Fumbles) */}
               {actionSummary.type === 'flee' && !actionSummary.isHit && (
-                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
-                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
-                      <span>Defy Fate & Alter Destiny</span>
+                actionSummary.isFumble ? (
+                  <div className="p-3.5 bg-gradient-to-r from-red-950/70 via-[#210f0f] to-red-950/70 border-2 border-red-800/80 rounded-xl shadow-lg flex items-center gap-3 text-xs font-serif text-red-200">
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                    <div>
+                      <span className="font-bold text-red-300">Fate Cannot Alter a Critical Fumble (Natural 1):</span>
+                      <p className="text-red-300/80 text-[11px] mt-0.5 leading-relaxed">
+                        Tripping on a Natural 1 cannot be reversed by Fate. You must recover your stance on the next turn.
+                      </p>
                     </div>
-                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
-                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
-                    </span>
                   </div>
+                ) : (
+                  <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                        <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                        <span>Defy Fate & Alter Destiny</span>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                        {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                      </span>
+                    </div>
 
-                  <p className="text-xs text-purple-300/90 font-serif">
-                    Spend 1 Fate Reroll to re-attempt your escape roll immediately before the enemy attacks!
-                  </p>
+                    <p className="text-xs text-purple-300/90 font-serif">
+                      Spend 1 Fate Reroll to re-attempt your escape roll immediately before the enemy attacks!
+                    </p>
 
-                  <button
-                    id="btn-fate-reroll-flee"
-                    disabled={hero.rerollTokens <= 0}
-                    onClick={handleFateRerollFlee}
-                    className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
-                      hero.rerollTokens > 0
-                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
-                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    <Dices className="w-4 h-4 text-purple-200" />
-                    <span>
-                      {hero.rerollTokens > 0
-                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available) - Reroll Escape`
-                        : 'No Fate Tokens in Inventory'}
-                    </span>
-                  </button>
-                </div>
+                    <button
+                      id="btn-fate-reroll-flee"
+                      disabled={hero.rerollTokens <= 0}
+                      onClick={handleFateRerollFlee}
+                      className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                        hero.rerollTokens > 0
+                          ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                          : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <Dices className="w-4 h-4 text-purple-200" />
+                      <span>
+                        {hero.rerollTokens > 0
+                          ? `✦ Use Fate Reroll (${hero.rerollTokens} Available) - Reroll Escape`
+                          : 'No Fate Tokens in Inventory'}
+                      </span>
+                    </button>
+                  </div>
+                )
               )}
 
               <div className="flex justify-end pt-2">
@@ -1483,8 +1958,34 @@ export const CombatView: React.FC<CombatViewProps> = ({
                 )}
               </div>
 
-              <div className="p-4 bg-stone-900/80 rounded-lg border border-red-900/60 text-sm text-stone-200 leading-relaxed font-serif">
-                {actionSummary.details}
+              <div className="p-4 bg-stone-900/80 rounded-lg border border-red-900/60 text-sm text-stone-200 leading-relaxed font-serif space-y-2">
+                <div className="whitespace-pre-line">{actionSummary.details}</div>
+
+                {/* Stumbled Turn Skipping Notification */}
+                {combat.heroStumbled && (
+                  <div className="p-3 bg-gradient-to-r from-red-950/90 via-amber-950/90 to-red-950/90 border-2 border-red-500 rounded-lg text-red-200 text-xs font-serif space-y-1 shadow-lg">
+                    <div className="flex items-center gap-2 font-bold text-red-300">
+                      <AlertTriangle className="w-4 h-4 text-red-400 animate-bounce" />
+                      <span>STUMBLED & OFF-BALANCE (Turn Forfeit Required)</span>
+                    </div>
+                    <p className="text-red-100/90">
+                      Because you rolled a Critical Fumble (Natural 1), you are off-balance and must <strong>FORFEIT Round {combat.turnNumber}</strong> to steady your stance while {monster.name} strikes again!
+                    </p>
+                  </div>
+                )}
+
+                {/* Monster Staggered Notification */}
+                {combat.monsterStumbled && (
+                  <div className="p-3 bg-gradient-to-r from-emerald-950/90 via-[#132c1c] to-emerald-950/90 border-2 border-emerald-500 rounded-lg text-emerald-200 text-xs font-serif space-y-1 shadow-lg">
+                    <div className="flex items-center gap-2 font-bold text-emerald-300">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                      <span>ENEMY STAGGERED & DEFENSES OPEN!</span>
+                    </div>
+                    <p className="text-emerald-100/90">
+                      {monster.name} rolled a Natural 1 Fumble! Its balance is broken, granting you <strong>+2 Advantage Bonus</strong> to your upcoming attack roll!
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Fate Dodge Opportunity when Monster lands a Hit on Hero */}
@@ -1531,6 +2032,15 @@ export const CombatView: React.FC<CombatViewProps> = ({
                     <Skull className="w-5 h-5 animate-bounce" />
                     Hero has fallen...
                   </div>
+                ) : combat.heroStumbled ? (
+                  <button
+                    id="btn-forfeit-stumble-turn"
+                    onClick={handleHeroRecoverStumble}
+                    className="px-6 py-3 bg-gradient-to-r from-red-700 via-amber-700 to-red-700 hover:from-red-600 hover:to-amber-600 text-stone-100 font-black font-serif rounded-xl shadow-xl flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
+                  >
+                    <AlertTriangle className="w-5 h-5 text-amber-300 animate-pulse" />
+                    <span>⚠️ Forfeit Round {combat.turnNumber} to Recover Balance ➔</span>
+                  </button>
                 ) : (
                   <button
                     id="btn-begin-next-round"
