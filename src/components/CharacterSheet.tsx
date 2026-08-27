@@ -7,6 +7,7 @@ import React from 'react';
 import {
   Heart,
   Wand2,
+  Zap,
   Shield,
   Coins,
   Dices,
@@ -112,14 +113,14 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
           </div>
         </div>
 
-        {/* Mana */}
+        {/* Energy */}
         <div>
           <div className="flex justify-between text-[11px] font-mono mb-0.5">
             <span className="text-cyan-300 flex items-center gap-1">
-              <Wand2 className="w-3 h-3 text-cyan-400" /> Mana
+              <Zap className="w-3 h-3 text-cyan-400" /> Energy
             </span>
             <span className="font-bold text-cyan-200">
-              {hero.currentMana} / {hero.maxMana}
+              {hero.currentMana} / {hero.maxMana} EP
             </span>
           </div>
           <div className="w-full h-2.5 bg-[#140e0a] rounded-full overflow-hidden border border-[#442e1d]">

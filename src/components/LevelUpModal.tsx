@@ -21,7 +21,7 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ hero, onConfirmLevel
     { key: 'STR', label: 'Strength', desc: '+Melee attack damage, weapon checks' },
     { key: 'DEX', label: 'Dexterity', desc: '+Armor Class (AC), trap disarm, ranged accuracy' },
     { key: 'CON', label: 'Constitution', desc: '+Max Health Points, poison/wound resistance' },
-    { key: 'INT', label: 'Intelligence', desc: '+Max Mana, magic spell damage, rune deciphering' },
+    { key: 'INT', label: 'Intelligence', desc: '+Max Energy, magic spell damage, rune deciphering' },
     { key: 'LCK', label: 'Luck', desc: '+Critical hit chance, bonus loot rolls, escape checks' },
   ];
 
@@ -54,8 +54,8 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ hero, onConfirmLevel
             <span className="font-mono font-bold text-red-200">+8 Max HP</span>
           </div>
           <div className="flex flex-col items-center">
-            <Wand2 className="w-4 h-4 text-cyan-400 mb-0.5" />
-            <span className="font-mono font-bold text-cyan-200">+6 Max Mana</span>
+            <Zap className="w-4 h-4 text-cyan-400 mb-0.5" />
+            <span className="font-mono font-bold text-cyan-200">+6 Max Energy</span>
           </div>
           <div className="flex flex-col items-center">
             <Dices className="w-4 h-4 text-purple-400 mb-0.5" />

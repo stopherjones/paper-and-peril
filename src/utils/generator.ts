@@ -690,7 +690,7 @@ export function generateDungeonFloor(floorNumber: number): DungeonFloor {
         const shrineDef = SHRINE_EVENTS[(floorNumber - 1) % SHRINE_EVENTS.length] || SHRINE_EVENTS[0];
         title = shrineDef.name;
         description = shrineDef.description;
-        flavorText = `A divine altar dedicated to ${shrineDef.godName}. Offering a prayer restores health and mana.`;
+        flavorText = `A divine altar dedicated to ${shrineDef.godName}. Offering a prayer restores health and energy.`;
         shrine = {
           id: shrineDef.id,
           name: shrineDef.name,

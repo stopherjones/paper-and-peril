@@ -9,7 +9,7 @@ export interface CharacterStats {
   STR: number; // Strength (Melee attack, physical checks, encumbrance)
   DEX: number; // Agility / Dexterity (Defense / AC, ranged / sneak, trap disarm)
   CON: number; // Constitution (Max HP, resistance, stamina)
-  INT: number; // Intelligence (Magic damage, mana, lore checks, scroll casting)
+  INT: number; // Intelligence (Magic damage, energy capacity, lore checks, scroll casting)
   LCK: number; // Luck (Critical chance, loot rolls, flee checks, event bonuses)
 }
 
@@ -26,6 +26,7 @@ export interface ClassDefinition {
   baseStats: CharacterStats;
   hpFormula: { base: number; perLevel: number };
   manaFormula: { base: number; perLevel: number };
+  energyFormula?: { base: number; perLevel: number };
   startingGold: number;
   startingEquipment: string[]; // Item IDs
   gearHighlights: { name: string; type: string; bonus: string; icon: string }[];
@@ -38,6 +39,7 @@ export interface HeroSkill {
   name: string;
   description: string;
   manaCost: number;
+  energyCost?: number;
   cooldownTurns: number;
   currentCooldown?: number;
   type: 'attack' | 'buff' | 'heal' | 'utility';
@@ -71,6 +73,7 @@ export interface GameItem {
   bonusDamage?: number;
   healHp?: number;
   healMana?: number;
+  healEnergy?: number;
   charges?: number;
   maxCharges?: number;
   specialEffect?: ItemSpecialEffect;
@@ -122,8 +125,10 @@ export interface HeroCharacter {
   xpToNextLevel: number;
   currentHp: number;
   maxHp: number;
-  currentMana: number;
-  maxMana: number;
+  currentMana: number; // Represents hero's Current Energy
+  maxMana: number; // Represents hero's Max Energy
+  currentEnergy?: number;
+  maxEnergy?: number;
   stats: CharacterStats;
   baseStats: CharacterStats; // Raw stats rolled at creation
   equipment: Equipment;

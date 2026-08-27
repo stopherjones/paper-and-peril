@@ -369,7 +369,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-cyan-200 font-serif">{skill.name}</span>
                       <span className="text-[9px] font-mono text-cyan-300 bg-cyan-950 px-1 py-0.2 rounded border border-cyan-800">
-                        {skill.manaCost} MP
+                        {skill.manaCost} EP
                       </span>
                     </div>
                     <p className="text-[10px] text-stone-400 font-serif">{skill.description}</p>
@@ -520,7 +520,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                   )}
                   {inspectTarget.item.healMana && (
                     <span className="bg-[#1b142e] px-2 py-1 rounded border border-[#3b2a63] text-purple-300 font-bold">
-                      ✨ Restores: +{inspectTarget.item.healMana} MP
+                      ⚡ Restores: +{inspectTarget.item.healMana} EP
                     </span>
                   )}
                   {inspectTarget.item.statBonuses &&

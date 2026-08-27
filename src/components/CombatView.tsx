@@ -386,9 +386,11 @@ export const CombatView: React.FC<CombatViewProps> = ({
     combat.combatLogs = [entry, ...combat.combatLogs];
   };
 
-  // 1. HERO INITIATES WEAPON ATTACK (Step 1: Roll d20 to hit)
+  // 1. HERO INITIATES WEAPON ATTACK (Costs 2 Energy)
   const handleHeroAttack = () => {
-    if (combatStep !== 'HERO_CHOICE' || monster.hp <= 0) return;
+    if (combatStep !== 'HERO_CHOICE' || monster.hp <= 0 || hero.currentMana < 2) return;
+    hero.currentMana -= 2;
+    onUpdateHero({ ...hero });
     setCombatStep('HERO_ATTACK_ROLLING');
     sounds.playDiceRoll();
 
@@ -750,28 +752,32 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }, 600);
   };
 
-  // 4. HERO DEFEND STANCE & COUNTER-ATTACK
+  // 4. HERO DEFEND STANCE & COUNTER-ATTACK (Costs 5 Energy)
   const handleHeroDefend = () => {
-    if (combatStep !== 'HERO_CHOICE') return;
+    if (combatStep !== 'HERO_CHOICE' || hero.currentMana < 5) return;
+    hero.currentMana -= 5;
+    onUpdateHero({ ...hero });
     combat.heroDefending = true;
     sounds.playBlock();
 
     const shieldAbsorb = 3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0);
 
     setActionSummary({
-      title: `${guardProfile.actionName} Activated`,
-      details: `🛡️ DEFENSIVE STANCE ACTIVE:\n• Fortified Defenses: +4 Armor Class (Your AC ${heroAc} ➔ ${heroAc + 4})\n• Damage Absorption: Absorbs ${shieldAbsorb} incoming monster damage\n• ⚔️ COUNTER-ATTACK PRIMED: Ready to execute a retaliatory ${guardProfile.counterName} (${guardProfile.counterFormula} + ${guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} ${guardProfile.counterStatKey}) when ${monster.name} attacks!`,
+      title: `${guardProfile.actionName} Activated (-5 EP)`,
+      details: `🛡️ DEFENSIVE STANCE ACTIVE:\n• Cost: 5 Energy\n• Fortified Defenses: +4 Armor Class (Your AC ${heroAc} ➔ ${heroAc + 4})\n• Damage Absorption: Absorbs ${shieldAbsorb} incoming monster damage\n• ⚔️ COUNTER-ATTACK PRIMED: Ready to execute a retaliatory ${guardProfile.counterName} (${guardProfile.counterFormula} + ${guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} ${guardProfile.counterStatKey}) when ${monster.name} attacks!`,
       type: 'hero',
     });
 
-    addLog('hero', guardProfile.actionName, `Raised defense (+4 AC, -${shieldAbsorb} dmg) & primed ${guardProfile.counterName}.`);
+    addLog('hero', guardProfile.actionName, `Spent 5 Energy: Raised defense (+4 AC, -${shieldAbsorb} dmg) & primed ${guardProfile.counterName}.`);
     onUpdateCombat({ ...combat });
     setCombatStep('HERO_NON_DAMAGE_RESULT');
   };
 
-  // 5. ATTEMPT FLEE ACTION
+  // 5. ATTEMPT FLEE ACTION (Costs 1 Energy)
   const handleAttemptFlee = () => {
-    if (combatStep !== 'HERO_CHOICE') return;
+    if (combatStep !== 'HERO_CHOICE' || hero.currentMana < 1) return;
+    hero.currentMana -= 1;
+    onUpdateHero({ ...hero });
     setCombatStep('HERO_ATTACK_ROLLING');
     sounds.playDiceRoll();
 
@@ -909,17 +915,17 @@ export const CombatView: React.FC<CombatViewProps> = ({
       return;
     }
 
-    // C. RESTORATIVE POTIONS / CONSUMABLES (HP & Mana)
+    // C. RESTORATIVE POTIONS / CONSUMABLES (HP & Energy)
     if (item.healHp && item.healMana) {
       sounds.playHeal();
       hero.currentHp = Math.min(hero.maxHp, hero.currentHp + item.healHp);
       hero.currentMana = Math.min(hero.maxMana, hero.currentMana + item.healMana);
       setActionSummary({
         title: `Consumed ${item.name}!`,
-        details: `Restored ${item.healHp} HP and ${item.healMana} Mana! Current HP: ${hero.currentHp}/${hero.maxHp}, Mana: ${hero.currentMana}/${hero.maxMana}.`,
+        details: `Restored ${item.healHp} HP and ${item.healMana} Energy! Current HP: ${hero.currentHp}/${hero.maxHp}, Energy: ${hero.currentMana}/${hero.maxMana}.`,
         type: 'hero',
       });
-      addLog('hero', `Used ${item.name}`, `Restored ${item.healHp} HP and ${item.healMana} Mana.`);
+      addLog('hero', `Used ${item.name}`, `Restored ${item.healHp} HP and ${item.healMana} Energy.`);
     } else if (item.healHp) {
       sounds.playHeal();
       hero.currentHp = Math.min(hero.maxHp, hero.currentHp + item.healHp);
@@ -934,10 +940,10 @@ export const CombatView: React.FC<CombatViewProps> = ({
       hero.currentMana = Math.min(hero.maxMana, hero.currentMana + item.healMana);
       setActionSummary({
         title: `Drank ${item.name}!`,
-        details: `Restored ${item.healMana} Mana! Current Mana: ${hero.currentMana}/${hero.maxMana}.`,
+        details: `Restored ${item.healMana} Energy! Current Energy: ${hero.currentMana}/${hero.maxMana}.`,
         type: 'hero',
       });
-      addLog('hero', `Used ${item.name}`, `Restored ${item.healMana} Mana.`);
+      addLog('hero', `Used ${item.name}`, `Restored ${item.healMana} Energy.`);
     } else {
       sounds.playMagic();
       setActionSummary({
@@ -1699,9 +1705,9 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
               <div>
                 <div className="flex justify-between text-[11px] font-mono">
-                  <span className="text-cyan-400 font-bold">Mana</span>
+                  <span className="text-cyan-400 font-bold">Energy</span>
                   <span className="text-stone-300">
-                    {hero.currentMana} / {hero.maxMana}
+                    {hero.currentMana} / {hero.maxMana} EP
                   </span>
                 </div>
                 <div className="w-full bg-stone-900 rounded-full h-2 border border-stone-800 overflow-hidden">
@@ -1837,59 +1843,85 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
               {/* Action Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* 1. Attack with Weapon */}
-                <button
-                  id="btn-combat-weapon-attack"
-                  onClick={handleHeroAttack}
-                  className="p-3.5 bg-gradient-to-r from-amber-950/70 via-stone-900 to-stone-900 border-2 border-amber-600 hover:border-amber-300 rounded-xl text-left transition-all cursor-pointer transform active:scale-98 group flex flex-col justify-between shadow-md"
-                >
-                  <div className="flex items-start gap-3 mb-2">
-                    <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400 group-hover:scale-110 transition-transform shrink-0">
-                      <Sword className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-serif font-bold text-amber-200 text-sm">
-                        Attack with {primaryWeapon?.name || 'Bare Fists'}
+                {/* 1. Attack with Weapon (2 Energy) */}
+                {(() => {
+                  const canAfford = hero.currentMana >= 2;
+                  return (
+                    <button
+                      id="btn-combat-weapon-attack"
+                      onClick={handleHeroAttack}
+                      disabled={!canAfford}
+                      className={`p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md ${
+                        canAfford
+                          ? 'bg-gradient-to-r from-amber-950/70 via-stone-900 to-stone-900 border-amber-600 hover:border-amber-300 cursor-pointer transform active:scale-98 group'
+                          : 'bg-stone-950/40 border-stone-800/80 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className={`p-2 rounded-lg shrink-0 ${canAfford ? 'bg-amber-500/20 text-amber-400 group-hover:scale-110 transition-transform' : 'bg-stone-800 text-stone-500'}`}>
+                          <Sword className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-serif font-bold text-amber-200 text-sm flex items-center justify-between">
+                            <span>Attack with {primaryWeapon?.name || 'Bare Fists'}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-950 text-amber-300 rounded border border-amber-800">
+                              2 EP
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-amber-400/90 font-mono mt-0.5">
+                            Roll: 1d20 {totalWeaponAtkMod >= 0 ? `+ ${totalWeaponAtkMod}` : totalWeaponAtkMod} ({weaponStatBreakdown}) vs AC {monster.armorClass}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-amber-400/90 font-mono mt-0.5">
-                        Roll: 1d20 {totalWeaponAtkMod >= 0 ? `+ ${totalWeaponAtkMod}` : totalWeaponAtkMod} ({weaponStatBreakdown}) vs AC {monster.armorClass}
+                      <div className="w-full bg-[#130d08] p-1.5 rounded border border-[#3b2716] text-[10px] font-mono text-stone-300">
+                        <span className="text-amber-400 font-bold">Damage:</span> {weaponFormula}{' '}
+                        {weaponBonus >= 0 ? `+ ${weaponBonus}` : weaponBonus} ({weaponStatBreakdown}) • Threat 20 (x2 Crit)
                       </div>
-                    </div>
-                  </div>
-                  <div className="w-full bg-[#130d08] p-1.5 rounded border border-[#3b2716] text-[10px] font-mono text-stone-300">
-                    <span className="text-amber-400 font-bold">Damage:</span> {weaponFormula}{' '}
-                    {weaponBonus >= 0 ? `+ ${weaponBonus}` : weaponBonus} ({weaponStatBreakdown}) • Threat 20 (x2 Crit)
-                  </div>
-                </button>
+                    </button>
+                  );
+                })()}
 
-                {/* 2. Defend Guard & Counter-Attack */}
-                <button
-                  id="btn-combat-defend"
-                  onClick={handleHeroDefend}
-                  className="p-3.5 bg-gradient-to-r from-blue-950/70 via-stone-900 to-stone-900 border-2 border-blue-600 hover:border-blue-300 rounded-xl text-left transition-all cursor-pointer transform active:scale-98 group flex flex-col justify-between shadow-md"
-                >
-                  <div className="flex items-start gap-3 mb-2">
-                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400 group-hover:scale-110 transition-transform shrink-0">
-                      <Shield className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-serif font-bold text-blue-200 text-sm">
-                        {guardProfile.actionName}
+                {/* 2. Defend Guard & Counter-Attack (5 Energy) */}
+                {(() => {
+                  const canAfford = hero.currentMana >= 5;
+                  return (
+                    <button
+                      id="btn-combat-defend"
+                      onClick={handleHeroDefend}
+                      disabled={!canAfford}
+                      className={`p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md ${
+                        canAfford
+                          ? 'bg-gradient-to-r from-blue-950/70 via-stone-900 to-stone-900 border-blue-600 hover:border-blue-300 cursor-pointer transform active:scale-98 group'
+                          : 'bg-stone-950/40 border-stone-800/80 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className={`p-2 rounded-lg shrink-0 ${canAfford ? 'bg-blue-500/20 text-blue-400 group-hover:scale-110 transition-transform' : 'bg-stone-800 text-stone-500'}`}>
+                          <Shield className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-serif font-bold text-blue-200 text-sm flex items-center justify-between">
+                            <span>{guardProfile.actionName}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-blue-950 text-blue-300 rounded border border-blue-800">
+                              5 EP
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-blue-400/90 font-mono mt-0.5">
+                            {guardProfile.actionSubtitle}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-blue-400/90 font-mono mt-0.5">
-                        {guardProfile.actionSubtitle}
+                      <div className="w-full bg-[#0d121a] p-1.5 rounded border border-[#1d2b40] text-[10px] font-mono text-stone-300 flex flex-col gap-0.5">
+                        <div>
+                          <span className="text-blue-300 font-bold">Defense:</span> Absorbs {3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)} dmg (+3 Base{hero.equipment.shield?.armorBonus ? ` +${hero.equipment.shield.armorBonus} Shield` : ''})
+                        </div>
+                        <div>
+                          <span className="text-amber-400 font-bold">⚔️ Retaliation:</span> Counter {guardProfile.counterName} ({guardProfile.counterFormula} + {guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} {guardProfile.counterStatKey})
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <div className="w-full bg-[#0d121a] p-1.5 rounded border border-[#1d2b40] text-[10px] font-mono text-stone-300 flex flex-col gap-0.5">
-                    <div>
-                      <span className="text-blue-300 font-bold">Defense:</span> Absorbs {3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)} dmg (+3 Base{hero.equipment.shield?.armorBonus ? ` +${hero.equipment.shield.armorBonus} Shield` : ''})
-                    </div>
-                    <div>
-                      <span className="text-amber-400 font-bold">⚔️ Retaliation:</span> Counter {guardProfile.counterName} ({guardProfile.counterFormula} + {guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} {guardProfile.counterStatKey})
-                    </div>
-                  </div>
-                </button>
+                    </button>
+                  );
+                })()}
 
                 {/* 3. Hero Spells & Class Skills */}
                 {hero.skills.map((skill) => {
@@ -1916,7 +1948,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
                           <div className="font-serif font-bold text-purple-200 text-sm flex items-center justify-between">
                             <span>{skill.name}</span>
                             <span className="text-[10px] font-mono px-1.5 py-0.2 bg-purple-950 text-purple-300 rounded border border-purple-800">
-                              {skill.manaCost} MP
+                              {skill.manaCost} EP
                             </span>
                           </div>
                           <div className="text-[11px] text-purple-300/90 font-mono mt-0.5">
@@ -1931,29 +1963,42 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   );
                 })}
 
-                {/* 4. Attempt Flee Button */}
-                <button
-                  id="btn-combat-flee"
-                  onClick={handleAttemptFlee}
-                  className="p-3.5 bg-gradient-to-r from-stone-900 via-stone-900 to-stone-900 border-2 border-stone-700 hover:border-amber-400 rounded-xl text-left transition-all cursor-pointer transform active:scale-98 group flex flex-col justify-between shadow-md"
-                >
-                  <div className="flex items-start gap-3 mb-2">
-                    <div className="p-2 bg-stone-800 rounded-lg text-amber-300 group-hover:scale-110 transition-transform shrink-0">
-                      <Footprints className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-serif font-bold text-stone-200 text-sm">
-                        Attempt Tactical Escape
+                {/* 4. Attempt Tactical Escape (1 Energy) */}
+                {(() => {
+                  const canAfford = hero.currentMana >= 1;
+                  return (
+                    <button
+                      id="btn-combat-flee"
+                      onClick={handleAttemptFlee}
+                      disabled={!canAfford}
+                      className={`p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md ${
+                        canAfford
+                          ? 'bg-gradient-to-r from-stone-900 via-stone-900 to-stone-900 border-stone-700 hover:border-amber-400 cursor-pointer transform active:scale-98 group'
+                          : 'bg-stone-950/40 border-stone-800/80 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className={`p-2 rounded-lg shrink-0 ${canAfford ? 'bg-stone-800 text-amber-300 group-hover:scale-110 transition-transform' : 'bg-stone-800 text-stone-500'}`}>
+                          <Footprints className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-serif font-bold text-stone-200 text-sm flex items-center justify-between">
+                            <span>Attempt Tactical Escape</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-stone-800 text-amber-300 rounded border border-stone-600">
+                              1 EP
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-stone-400 font-mono mt-0.5">
+                            Roll: 1d20 {fleeMod >= 0 ? `+ ${fleeMod}` : fleeMod} ({fleeMod >= 0 ? `+${fleeMod}` : fleeMod} {fleeStatKey}) vs DC {10 + monster.level}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-stone-400 font-mono mt-0.5">
-                        Roll: 1d20 {fleeMod >= 0 ? `+ ${fleeMod}` : fleeMod} ({fleeMod >= 0 ? `+${fleeMod}` : fleeMod} {fleeStatKey}) vs DC {10 + monster.level}
+                      <div className="w-full bg-[#14120f] p-1.5 rounded border border-[#38332a] text-[10px] font-mono text-stone-300">
+                        <span className="text-amber-300 font-bold">Flee Rule:</span> DC {10 + monster.level} (Base 10 + Lvl {monster.level} Monster) • Retreats safely to previous chamber.
                       </div>
-                    </div>
-                  </div>
-                  <div className="w-full bg-[#14120f] p-1.5 rounded border border-[#38332a] text-[10px] font-mono text-stone-300">
-                    <span className="text-amber-300 font-bold">Flee Rule:</span> DC {10 + monster.level} (Base 10 + Lvl {monster.level} Monster) • Retreats safely to previous chamber.
-                  </div>
-                </button>
+                    </button>
+                  );
+                })()}
               </div>
 
               {/* Combat Consumables in Pack */}
@@ -1978,7 +2023,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
                           <span className="text-[10px] font-mono text-emerald-400">(+{inv.item.healHp} HP)</span>
                         )}
                         {inv.item.healMana && (
-                          <span className="text-[10px] font-mono text-cyan-400">(+{inv.item.healMana} MP)</span>
+                          <span className="text-[10px] font-mono text-cyan-400">(+{inv.item.healMana} EP)</span>
                         )}
                         {inv.item.damageDice && (
                           <span className="text-[10px] font-mono text-orange-400">({inv.item.damageDice} Fire Dmg)</span>

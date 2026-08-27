@@ -68,7 +68,7 @@ const STAT_ORDER: { key: StatType; label: string; desc: string }[] = [
   { key: 'STR', label: 'Strength', desc: 'Melee weapon damage, physical checks & bash' },
   { key: 'DEX', label: 'Dexterity', desc: 'Agility, armor class bonus & trap disarm' },
   { key: 'CON', label: 'Constitution', desc: 'Health points, stamina & poison resilience' },
-  { key: 'INT', label: 'Intelligence', desc: 'Arcane spell power, mana capacity & lore' },
+  { key: 'INT', label: 'Intelligence', desc: 'Arcane spell power, energy capacity & lore' },
   { key: 'LCK', label: 'Luck', desc: 'Critical strike chance & dungeon loot rolls' },
 ];
 
@@ -542,9 +542,9 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-stone-400">
-                        <span>Base HP / Mana:</span>
+                        <span>Base HP / Energy:</span>
                         <span className="text-stone-300 font-bold">
-                          {heroClass.hpFormula.base} HP / {heroClass.manaFormula.base} MP
+                          {heroClass.hpFormula.base} HP / {heroClass.manaFormula.base} EP
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-stone-400">

@@ -575,7 +575,7 @@ export default function App() {
       },
       phase: 'EXPLORATION',
       historyLog: [
-        `Descended the spiral staircase into Floor ${nextFloorNumber}. The warm embers of the entrance Hearth fully revitalized your HP (${updatedHero?.maxHp}/${updatedHero?.maxHp}) & Mana (${updatedHero?.maxMana}/${updatedHero?.maxMana})!`,
+        `Descended the spiral staircase into Floor ${nextFloorNumber}. The warm embers of the entrance Hearth fully revitalized your HP (${updatedHero?.maxHp}/${updatedHero?.maxHp}) & Energy (${updatedHero?.maxMana}/${updatedHero?.maxMana} EP)!`,
         ...prev.historyLog,
       ],
     }));

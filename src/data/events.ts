@@ -8,16 +8,17 @@ export interface ShrineEvent {
   name: string;
   godName: string;
   description: string;
-  options: {
+    options: {
     label: string;
     description: string;
-    costType?: 'gold' | 'hp' | 'mana' | 'free';
+    costType?: 'gold' | 'hp' | 'mana' | 'energy' | 'free';
     costAmount?: number;
     statCheck?: { stat: 'STR' | 'DEX' | 'CON' | 'INT' | 'LCK'; dc: number };
     successEffect: {
       message: string;
       hp?: number;
       mana?: number;
+      energy?: number;
       gold?: number;
       rerollTokens?: number;
       buff?: string;
@@ -52,9 +53,10 @@ export const SHRINE_EVENTS: ShrineEvent[] = [
         costType: 'gold',
         costAmount: 15,
         successEffect: {
-          message: 'Solarius smiles upon your offering. You receive full HP, 15 Mana, and a mystical Dice of Fate token!',
+          message: 'Solarius smiles upon your offering. You receive full HP, 15 Energy, and a mystical Dice of Fate token!',
           hp: 999,
           mana: 15,
+          energy: 15,
           rerollTokens: 1,
         },
       },
@@ -71,8 +73,9 @@ export const SHRINE_EVENTS: ShrineEvent[] = [
         description: 'Cup your hands and drink from the glowing well.',
         costType: 'free',
         successEffect: {
-          message: 'The cool water revitalizes your spirit, restoring 20 Mana and 10 HP.',
+          message: 'The cool water revitalizes your spirit, restoring 20 Energy and 10 HP.',
           mana: 20,
+          energy: 20,
           hp: 10,
         },
       },

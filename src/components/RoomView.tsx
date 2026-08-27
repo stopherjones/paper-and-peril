@@ -294,7 +294,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
     room.shrine.used = true;
     hero.currentHp = Math.min(hero.maxHp, hero.currentHp + 15);
     hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 12);
-    setEventMessage(`✦ The blessing of ${room.shrine.god} envelopes you! Restored 15 HP & 12 Mana.`);
+    setEventMessage(`✦ The blessing of ${room.shrine.god} envelopes you! Restored 15 HP & 12 Energy.`);
     onUpdateHero({ ...hero });
     onUpdateRoom({ ...room });
   };
@@ -650,12 +650,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-stone-300 font-serif leading-relaxed">
-                A safe, sheltered alcove around the floor entrance staircase. Your <strong>HP and Mana were fully replenished</strong> when you descended to this floor.
+                A safe, sheltered alcove around the floor entrance staircase. Your <strong>HP and Energy were fully replenished</strong> when you descended to this floor.
               </p>
               <div className="bg-[#18110c] border border-amber-900/60 rounded-lg p-3 text-xs font-serif text-amber-200/90 flex items-start gap-2.5">
                 <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div className="text-[11px] leading-relaxed text-amber-200/90">
-                  <strong className="text-amber-300">Sanctuary Rules:</strong> Mid-level resting at the hearth is not permitted. While exploring this floor, use <strong>food rations and healing potions</strong> directly from your backpack, or seek out sacred <strong>divine shrines</strong> to restore your health and mana.
+                  <strong className="text-amber-300">Sanctuary Rules:</strong> Mid-level resting at the hearth is not permitted. While exploring this floor, use <strong>food rations and healing potions</strong> directly from your backpack, or seek out sacred <strong>divine shrines</strong> to restore your health and energy.
                 </div>
               </div>
               {onOpenInventory && (
