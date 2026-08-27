@@ -44,6 +44,7 @@ export interface HeroSkill {
   diceFormula?: string; // e.g. "2d6+STR"
   effectValue?: number;
   icon: string;
+  level?: number;
 }
 
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -103,7 +104,13 @@ export interface StatusEffect {
   type: 'buff' | 'debuff';
   statModifiers?: Partial<CharacterStats>;
   armorModifier?: number;
-  damagePerTurn?: number;
+  damageReduction?: number; // e.g. 4 for Aura of Protection, 3 for Iron Guard
+  attackModifier?: number; // e.g. +3 for Divine Favor
+  critModifier?: number; // e.g. 0.15 for Hunter's Focus
+  evasionBonus?: number; // e.g. 0.75 for Smoke Bomb
+  shieldHp?: number; // e.g. 20 for Arcane Barrier
+  maxShieldHp?: number;
+  damagePerTurn?: number; // e.g. for poison DoT
   icon: string;
 }
 

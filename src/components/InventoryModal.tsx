@@ -21,8 +21,9 @@ import {
   Compass,
   Hammer,
   Trash2,
+  HelpCircle,
 } from 'lucide-react';
-import { GameItem, HeroCharacter, ItemType } from '../types/game';
+import { GameItem, HeroCharacter } from '../types/game';
 import { sounds } from '../utils/audio';
 import { dropItemFromHero, syncHeroSupplies } from '../utils/inventory';
 
@@ -35,15 +36,18 @@ interface InventoryModalProps {
   ) => void;
 }
 
+type InspectTarget =
+  | { type: 'inventory'; index: number; item: GameItem }
+  | { type: 'equipment'; slot: keyof HeroCharacter['equipment']; item: GameItem }
+  | null;
+
 export const InventoryModal: React.FC<InventoryModalProps> = ({
   hero,
   onUpdateHero,
   onClose,
   onActivateMapAction,
 }) => {
-  const [selectedItemIdx, setSelectedItemIdx] = useState<number | null>(null);
-
-  const selectedInv = selectedItemIdx !== null ? hero.inventory[selectedItemIdx] : null;
+  const [inspectTarget, setInspectTarget] = useState<InspectTarget>(null);
 
   // Equip Item
   const handleEquipItem = (invIdx: number) => {
@@ -75,7 +79,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     }
 
     syncHeroSupplies(hero);
-    setSelectedItemIdx(null);
+    setInspectTarget(null);
     onUpdateHero({ ...hero });
   };
 
@@ -92,6 +96,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     hero.equipment[slotKey] = undefined;
     hero.inventory.push({ item, quantity: 1 });
     syncHeroSupplies(hero);
+    setInspectTarget(null);
     onUpdateHero({ ...hero });
   };
 
@@ -111,7 +116,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     }
 
     hero.inventory.splice(invIdx, 1);
-    setSelectedItemIdx(null);
+    setInspectTarget(null);
 
     syncHeroSupplies(hero);
     onUpdateHero({ ...hero });
@@ -121,28 +126,59 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const handleDropItem = (invIdx: number) => {
     sounds.playTrap();
     dropItemFromHero(hero, invIdx);
-    setSelectedItemIdx(null);
+    setInspectTarget(null);
     onUpdateHero({ ...hero });
   };
 
   const getItemCategoryLabel = (item: GameItem) => {
-    if (item.id === 'dungeon_ration') return 'Supply / Food';
-    if (item.id === 'iron_lockpick') return 'Tool / Picks';
-    if (item.id === 'dungeon_torch') return 'Tool / Torch';
+    if (item.id === 'dungeon_ration') return 'Ration / Food';
+    if (item.id === 'iron_lockpick') return 'Lockpick Tool';
+    if (item.id === 'dungeon_torch') return 'Torch Tool';
+    if (item.id === 'brass_spyglass') return 'Scouting Scope';
     if (item.id === 'dice_of_fate') return 'Relic / Fate';
-    if (item.type === 'potion') return 'Potion';
+    if (item.type === 'potion') return 'Potion / Draught';
     if (item.type === 'scroll') return 'Spell Scroll';
     if (item.type === 'weapon') return 'Weapon';
-    if (item.type === 'shield') return 'Shield';
+    if (item.type === 'shield') return 'Shield / Offhand';
     if (item.type === 'armor') return 'Armor';
-    if (item.type === 'treasure') return 'Treasure';
+    if (item.type === 'helmet') return 'Headgear';
+    if (item.type === 'boots') return 'Footwear';
+    if (item.type === 'ring') return 'Ring';
+    if (item.type === 'amulet') return 'Amulet';
+    if (item.type === 'treasure') return 'Treasure / Gem';
     return item.type;
+  };
+
+  const getItemUsageBadge = (item: GameItem) => {
+    if (
+      item.type === 'potion' ||
+      item.type === 'scroll' ||
+      item.id === 'dungeon_torch' ||
+      item.id === 'dungeon_ration' ||
+      item.id === 'miner_pickaxe'
+    ) {
+      return { label: 'Single-use', bg: 'bg-amber-950/80 text-amber-300 border-amber-600/70' };
+    }
+    if (item.id === 'dwarven_sledgehammer') {
+      return { label: '2 Uses', bg: 'bg-orange-950/80 text-orange-300 border-orange-600/70' };
+    }
+    if (item.id === 'iron_lockpick' || item.id === 'brass_spyglass' || item.id === 'ethereal_ring') {
+      return { label: 'Reusable Tool', bg: 'bg-cyan-950/80 text-cyan-300 border-cyan-500/70' };
+    }
+    if (['weapon', 'shield', 'armor', 'helmet', 'boots', 'ring', 'amulet'].includes(item.type)) {
+      return { label: 'Equipment', bg: 'bg-stone-800 text-stone-300 border-stone-600' };
+    }
+    if (item.type === 'treasure') {
+      return { label: 'Treasure', bg: 'bg-yellow-950/80 text-yellow-300 border-yellow-500/70' };
+    }
+    return { label: 'Item', bg: 'bg-stone-800 text-stone-300 border-stone-600' };
   };
 
   const getItemIcon = (item: GameItem) => {
     if (item.id === 'dungeon_ration') return <Utensils className="w-4 h-4 text-amber-500 shrink-0" />;
     if (item.id === 'iron_lockpick') return <Key className="w-4 h-4 text-cyan-400 shrink-0" />;
     if (item.id === 'dungeon_torch') return <Flame className="w-4 h-4 text-orange-400 shrink-0" />;
+    if (item.id === 'brass_spyglass') return <Compass className="w-4 h-4 text-cyan-300 shrink-0" />;
     if (item.id === 'dice_of_fate') return <Dices className="w-4 h-4 text-purple-400 shrink-0" />;
     if (item.type === 'potion') return <Heart className="w-4 h-4 text-red-400 shrink-0" />;
     if (item.type === 'scroll') return <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />;
@@ -231,7 +267,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               />
             </div>
             <span className="text-[10px] text-stone-500 hidden md:inline">
-              (1 item per slot)
+              (1 item per slot • Click any item to inspect/use)
             </span>
           </div>
 
@@ -240,7 +276,8 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               <button
                 id="inv-quick-ration"
                 onClick={() => {
-                  handleUseItem(hero.inventory.findIndex((i) => i.item.id === 'dungeon_ration'));
+                  const idx = hero.inventory.findIndex((i) => i.item.id === 'dungeon_ration');
+                  if (idx !== -1) handleUseItem(idx);
                 }}
                 className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#24160d] hover:bg-[#382315] border border-[#4d2f1b] transition-colors cursor-pointer text-amber-200"
                 title="Eat 1 Ration from pack (+8 HP)"
@@ -290,7 +327,15 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                 return (
                   <div
                     key={slot}
-                    className="p-2 bg-[#19110a] border border-[#442e1d] rounded-md flex items-center justify-between"
+                    onClick={() => {
+                      if (item) {
+                        sounds.playBlock();
+                        setInspectTarget({ type: 'equipment', slot, item });
+                      }
+                    }}
+                    className={`p-2 bg-[#19110a] border border-[#442e1d] rounded-md flex items-center justify-between transition-colors ${
+                      item ? 'hover:bg-[#2c1d11] cursor-pointer' : 'opacity-70'
+                    }`}
                   >
                     <div>
                       <span className="text-[10px] font-mono text-stone-500 block uppercase">{label}</span>
@@ -300,13 +345,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                     </div>
 
                     {item && (
-                      <button
-                        id={`btn-unequip-${slot}`}
-                        onClick={() => handleUnequipSlot(slot)}
-                        className="text-[10px] font-serif bg-[#382618] hover:bg-[#4d3521] text-stone-300 px-2 py-0.5 rounded border border-[#593d25] transition-colors cursor-pointer"
-                      >
-                        Unequip
-                      </button>
+                      <span className="text-[10px] font-serif text-amber-400/90 underline">
+                        Inspect
+                      </span>
                     )}
                   </div>
                 );
@@ -338,41 +379,45 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
             </div>
           </div>
 
-          {/* Right Column: Backpack Slots & Detail */}
+          {/* Right Column: Backpack Slots */}
           <div className="md:col-span-7 flex flex-col gap-3">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xs font-serif font-bold text-[#e6c898] uppercase tracking-wider">
                   Backpack Storage ({hero.inventory.length} / {hero.maxInventorySlots} Slots)
                 </h3>
+                <span className="text-[10px] font-serif text-stone-400 italic">
+                  Tap an item to open actions
+                </span>
               </div>
 
               {/* Grid of items (each item occupies 1 slot) */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {hero.inventory.map((inv, idx) => {
-                  const isSelected = selectedItemIdx === idx;
+                  const badge = getItemUsageBadge(inv.item);
                   return (
                     <button
                       key={idx}
                       id={`btn-inv-item-${idx}`}
                       onClick={() => {
-                        setSelectedItemIdx(idx);
                         sounds.playBlock();
+                        setInspectTarget({ type: 'inventory', index: idx, item: inv.item });
                       }}
-                      className={`p-2 rounded-lg border text-left flex flex-col justify-between min-h-[68px] transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#47301c] border-[#dfb15b] ring-1 ring-amber-400 text-amber-100 shadow'
-                          : 'bg-[#19110a] border-[#442e1d] text-stone-300 hover:bg-[#2e1f13]'
-                      }`}
+                      className="p-2 rounded-lg border bg-[#19110a] border-[#442e1d] text-stone-300 hover:bg-[#332214] hover:border-[#8c6b45] text-left flex flex-col justify-between min-h-[74px] transition-all cursor-pointer shadow-sm group"
                     >
-                      <div className="flex items-start gap-1.5">
-                        {getItemIcon(inv.item)}
-                        <span className="font-serif font-bold text-xs line-clamp-2 leading-tight">
-                          {inv.item.name}
-                        </span>
+                      <div>
+                        <div className="flex items-start gap-1.5 mb-1">
+                          {getItemIcon(inv.item)}
+                          <span className="font-serif font-bold text-xs line-clamp-2 leading-tight text-amber-100 group-hover:text-amber-300">
+                            {inv.item.name}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-[10px] text-stone-400 font-mono mt-1 pt-1 border-t border-[#362315]/60">
-                        <span className="text-[9px] text-amber-400/80 truncate">{getItemCategoryLabel(inv.item)}</span>
+
+                      <div className="flex items-center justify-between text-[10px] text-stone-400 font-mono pt-1 border-t border-[#362315]/60 mt-1">
+                        <span className={`text-[8px] font-mono font-bold px-1 py-0.2 rounded border ${badge.bg}`}>
+                          {badge.label}
+                        </span>
                         <span className="text-[9px] text-yellow-400/90 font-mono">{inv.item.value}g</span>
                       </div>
                     </button>
@@ -383,7 +428,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                 {Array.from({ length: Math.max(0, hero.maxInventorySlots - hero.inventory.length) }).map((_, i) => (
                   <div
                     key={`empty-slot-${i}`}
-                    className="p-2 rounded-lg border border-dashed border-[#382618]/70 bg-[#120c08]/50 flex flex-col items-center justify-center min-h-[68px] text-[10px] font-mono text-stone-600 select-none"
+                    className="p-2 rounded-lg border border-dashed border-[#382618]/70 bg-[#120c08]/50 flex flex-col items-center justify-center min-h-[74px] text-[10px] font-mono text-stone-600 select-none"
                   >
                     <span>[ Empty Slot ]</span>
                   </div>
@@ -391,174 +436,282 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               </div>
 
               {hero.inventory.length === 0 && (
-                <div className="text-center py-4 text-stone-500 font-serif text-xs">
-                  Your backpack is empty.
+                <div className="text-center py-6 text-stone-500 font-serif text-xs">
+                  Your backpack is empty. Open chests and defeat dungeon beasts to find loot!
                 </div>
               )}
             </div>
-
-            {/* Item Inspector Panel */}
-            {selectedInv && (
-              <div className="bg-[#17100a] border border-[#5c4028] p-3 rounded-lg mt-auto">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    {getItemIcon(selectedInv.item)}
-                    <span className="font-serif font-bold text-sm text-amber-200">{selectedInv.item.name}</span>
-                  </div>
-                  <span className="text-xs font-mono text-yellow-400">{selectedInv.item.value} Gold</span>
-                </div>
-
-                <div className="text-[10px] font-mono text-amber-400/80 uppercase mb-1">
-                  Category: {getItemCategoryLabel(selectedInv.item)} • 1 Slot
-                </div>
-
-                <p className="text-xs text-stone-300 font-serif leading-tight mb-2">
-                  {selectedInv.item.description}
-                </p>
-
-                <div className="flex flex-wrap gap-2 text-[11px] font-mono text-stone-400 mb-3">
-                  {selectedInv.item.damageDice && (
-                    <span className="bg-[#24170e] px-2 py-0.5 rounded border border-[#442d1b] text-red-300">
-                      Damage: {selectedInv.item.damageDice}
-                    </span>
-                  )}
-                  {selectedInv.item.armorBonus && (
-                    <span className="bg-[#24170e] px-2 py-0.5 rounded border border-[#442d1b] text-blue-300">
-                      Armor: +{selectedInv.item.armorBonus} AC
-                    </span>
-                  )}
-                  {selectedInv.item.healHp && (
-                    <span className="bg-[#24170e] px-2 py-0.5 rounded border border-[#442d1b] text-emerald-300">
-                      Heals: +{selectedInv.item.healHp} HP
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {['weapon', 'shield', 'armor', 'helmet', 'boots', 'ring', 'amulet'].includes(
-                    selectedInv.item.type
-                  ) && (
-                    <button
-                      id="btn-equip-selected"
-                      onClick={() => handleEquipItem(selectedItemIdx!)}
-                      className="flex-1 py-1.5 bg-[#8f6437] hover:bg-[#a67440] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] shadow transition-colors cursor-pointer"
-                    >
-                      Equip Item
-                    </button>
-                  )}
-
-                  {/* Healing, rations, and mana consumables */}
-                  {(selectedInv.item.healHp || selectedInv.item.healMana || selectedInv.item.id === 'dungeon_ration') && (
-                    <button
-                      id="btn-use-selected"
-                      onClick={() => handleUseItem(selectedItemIdx!)}
-                      className="flex-1 py-1.5 bg-[#2d5930] hover:bg-[#386e3c] text-emerald-100 font-serif font-bold text-xs rounded border border-emerald-500 shadow transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      {selectedInv.item.id === 'dungeon_ration' ? (
-                        <>
-                          <Utensils className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Eat Salted Ration (+8 HP)</span>
-                        </>
-                      ) : (
-                        <>
-                          <Heart className="w-3.5 h-3.5 text-emerald-300" />
-                          <span>Consume / Drink</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Clairvoyance Scroll */}
-                  {(selectedInv.item.id === 'scroll_of_clairvoyance' ||
-                    selectedInv.item.specialEffect === 'PEEK_ANY_ROOM') && (
-                    <button
-                      id="btn-clairvoyance-inv"
-                      onClick={() => {
-                        onClose();
-                        onActivateMapAction?.('CLAIRVOYANCE');
-                      }}
-                      className="flex-1 py-1.5 bg-[#49275e] hover:bg-[#5f327a] text-purple-100 font-serif font-bold text-xs rounded border border-purple-400 shadow transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-purple-300" />
-                      <span>Cast Clairvoyance ➔ Reveal Map Tile</span>
-                    </button>
-                  )}
-
-                  {/* Dungeon Pitch Torch */}
-                  {selectedInv.item.id === 'dungeon_torch' && (
-                    <button
-                      id="btn-torch-inv"
-                      onClick={() => {
-                        onClose();
-                        onActivateMapAction?.('TORCH');
-                      }}
-                      className="flex-1 py-1.5 bg-[#5e3818] hover:bg-[#78471e] text-orange-100 font-serif font-bold text-xs rounded border border-orange-500 shadow transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Flame className="w-3.5 h-3.5 text-orange-400" />
-                      <span>Light Torch ➔ Reveal Adjacent Room</span>
-                    </button>
-                  )}
-
-                  {/* Burglar's Spyglass */}
-                  {selectedInv.item.id === 'brass_spyglass' && (
-                    <button
-                      id="btn-spyglass-inv"
-                      onClick={() => {
-                        onClose();
-                        onActivateMapAction?.('SPYGLASS');
-                      }}
-                      className="flex-1 py-1.5 bg-[#4d3a22] hover:bg-[#634b2b] text-amber-100 font-serif font-bold text-xs rounded border border-amber-400 shadow transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Compass className="w-3.5 h-3.5 text-amber-300" />
-                      <span>Use Spyglass ➔ Scout Adjacent Room</span>
-                    </button>
-                  )}
-
-                  {/* Wall Breaching Tools (Pickaxe / Sledgehammer) */}
-                  {selectedInv.item.specialEffect === 'SMASH_WALL' && (
-                    <button
-                      id="btn-smash-wall-inv"
-                      onClick={() => {
-                        onClose();
-                        onActivateMapAction?.('SMASH_WALL');
-                      }}
-                      className="flex-1 py-1.5 bg-[#54231b] hover:bg-[#6e2e23] text-amber-200 border border-red-500 rounded text-xs font-serif font-bold flex items-center justify-center gap-1.5 shadow transition-colors cursor-pointer"
-                    >
-                      <Hammer className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Smash Wall ➔ Open Map</span>
-                    </button>
-                  )}
-
-                  {/* Wall Phasing Potion */}
-                  {selectedInv.item.specialEffect === 'PHASE_WALL' && (
-                    <button
-                      id="btn-phase-wall-inv"
-                      onClick={() => {
-                        onClose();
-                        onActivateMapAction?.('PHASE_WALL');
-                      }}
-                      className="flex-1 py-1.5 bg-[#3f2252] hover:bg-[#532d6b] text-purple-200 border border-purple-400 rounded text-xs font-serif font-bold flex items-center justify-center gap-1.5 shadow transition-colors cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-purple-300" />
-                      <span>Phase Wall ➔ Open Map</span>
-                    </button>
-                  )}
-
-                  {/* Drop / Discard Button */}
-                  <button
-                    id="btn-drop-selected"
-                    onClick={() => handleDropItem(selectedItemIdx!)}
-                    className="px-3 py-1.5 bg-[#2d1a16] hover:bg-[#42221b] text-red-300 font-serif text-xs rounded border border-red-800/80 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0"
-                    title="Discard this item to free 1 backpack slot"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                    <span>Drop</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Focused Item Inspector Pop-up Dialog */}
+        {inspectTarget && (
+          <div
+            id="item-inspector-popup"
+            className="fixed inset-0 z-[80] bg-black/75 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in"
+            onClick={() => setInspectTarget(null)}
+          >
+            <div
+              className="bg-[#241a12] border-4 border-[#c29653] rounded-xl max-w-md w-full p-5 text-stone-200 shadow-2xl relative animate-scale-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Pop-up Header */}
+              <div className="flex items-start justify-between border-b border-[#523924] pb-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-[#171008] border-2 border-amber-500/70 rounded-lg shadow-inner">
+                    {getItemIcon(inspectTarget.item)}
+                  </div>
+                  <div>
+                    <h3 className="font-serif font-black text-base text-[#f5e4c6] leading-tight">
+                      {inspectTarget.item.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-mono text-amber-300 uppercase">
+                        {getItemCategoryLabel(inspectTarget.item)}
+                      </span>
+                      <span
+                        className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                          getItemUsageBadge(inspectTarget.item).bg
+                        }`}
+                      >
+                        {getItemUsageBadge(inspectTarget.item).label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  id="btn-close-inspect-popup"
+                  onClick={() => setInspectTarget(null)}
+                  className="p-1 hover:bg-[#3d2a1c] rounded text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Value & Slot Weight */}
+              <div className="flex items-center justify-between bg-[#171008] px-3 py-1.5 rounded-lg border border-[#442e1d] mb-3 text-xs font-mono">
+                <span className="text-yellow-400 font-bold">{inspectTarget.item.value} Gold Value</span>
+                <span className="text-stone-400">Occupies 1 Backpack Slot</span>
+              </div>
+
+              {/* Stats & Attributes */}
+              {(inspectTarget.item.damageDice ||
+                inspectTarget.item.armorBonus ||
+                inspectTarget.item.healHp ||
+                inspectTarget.item.healMana ||
+                inspectTarget.item.statBonuses) && (
+                <div className="flex flex-wrap gap-2 text-xs font-mono mb-3">
+                  {inspectTarget.item.damageDice && (
+                    <span className="bg-[#2a170e] px-2 py-1 rounded border border-[#522d1b] text-red-300 font-bold">
+                      ⚔ Damage: {inspectTarget.item.damageDice}
+                      {inspectTarget.item.bonusDamage ? `+${inspectTarget.item.bonusDamage}` : ''}
+                    </span>
+                  )}
+                  {inspectTarget.item.armorBonus && (
+                    <span className="bg-[#121c2b] px-2 py-1 rounded border border-[#233b5c] text-blue-300 font-bold">
+                      🛡 Armor: +{inspectTarget.item.armorBonus} AC
+                    </span>
+                  )}
+                  {inspectTarget.item.healHp && (
+                    <span className="bg-[#122b17] px-2 py-1 rounded border border-[#235c2e] text-emerald-300 font-bold">
+                      ❤ Heals: +{inspectTarget.item.healHp} HP
+                    </span>
+                  )}
+                  {inspectTarget.item.healMana && (
+                    <span className="bg-[#1b142e] px-2 py-1 rounded border border-[#3b2a63] text-purple-300 font-bold">
+                      ✨ Restores: +{inspectTarget.item.healMana} MP
+                    </span>
+                  )}
+                  {inspectTarget.item.statBonuses &&
+                    Object.entries(inspectTarget.item.statBonuses).map(([stat, val]) => (
+                      <span
+                        key={stat}
+                        className="bg-[#24170e] px-2 py-1 rounded border border-[#442d1b] text-amber-200"
+                      >
+                        +{val} {stat}
+                      </span>
+                    ))}
+                </div>
+              )}
+
+              {/* Detailed Lore Description */}
+              <div className="bg-[#19110a] border border-[#3d2716] p-3 rounded-lg text-xs font-serif text-stone-300 leading-relaxed mb-4">
+                {inspectTarget.item.description}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                {inspectTarget.type === 'inventory' && (
+                  <>
+                    {/* Equip action */}
+                    {['weapon', 'shield', 'armor', 'helmet', 'boots', 'ring', 'amulet'].includes(
+                      inspectTarget.item.type
+                    ) && (
+                      <button
+                        id="btn-popup-equip-item"
+                        onClick={() => handleEquipItem(inspectTarget.index)}
+                        className="w-full py-2 bg-gradient-to-b from-[#8f6437] to-[#5e3b1c] hover:from-[#a67440] hover:to-[#6d4520] text-amber-100 font-serif font-bold text-xs rounded-lg border border-[#dfb15b] shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Sword className="w-4 h-4 text-amber-300" />
+                        <span>Equip to Active Gear Slot</span>
+                      </button>
+                    )}
+
+                    {/* Consumable actions */}
+                    {inspectTarget.item.id === 'dungeon_ration' && (
+                      <button
+                        id="btn-popup-eat-ration"
+                        onClick={() => handleUseItem(inspectTarget.index)}
+                        className="w-full py-2 bg-gradient-to-b from-[#2d5930] to-[#1d3d20] hover:from-[#386e3c] hover:to-[#244c27] text-emerald-100 font-serif font-bold text-xs rounded-lg border border-emerald-500 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Utensils className="w-4 h-4 text-amber-400" />
+                        <span>Eat Salted Ration (+8 HP) [Single-use]</span>
+                      </button>
+                    )}
+
+                    {(inspectTarget.item.type === 'potion' ||
+                      (inspectTarget.item.healHp && inspectTarget.item.id !== 'dungeon_ration') ||
+                      inspectTarget.item.healMana) && (
+                      <button
+                        id="btn-popup-drink-potion"
+                        onClick={() => handleUseItem(inspectTarget.index)}
+                        className="w-full py-2 bg-gradient-to-b from-[#2d5930] to-[#1d3d20] hover:from-[#386e3c] hover:to-[#244c27] text-emerald-100 font-serif font-bold text-xs rounded-lg border border-emerald-500 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Heart className="w-4 h-4 text-emerald-300" />
+                        <span>Drink Draught / Potion [Single-use]</span>
+                      </button>
+                    )}
+
+                    {/* Pitch Torch */}
+                    {inspectTarget.item.id === 'dungeon_torch' && (
+                      <button
+                        id="btn-popup-light-torch"
+                        onClick={() => {
+                          setInspectTarget(null);
+                          onClose();
+                          onActivateMapAction?.('TORCH');
+                        }}
+                        className="w-full py-2 bg-gradient-to-b from-[#784118] to-[#4d280d] hover:from-[#94511d] hover:to-[#613310] text-orange-100 font-serif font-bold text-xs rounded-lg border border-orange-500 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Flame className="w-4 h-4 text-orange-400" />
+                        <span>Light Torch ➔ Reveal Adjacent Chamber [Single-use]</span>
+                      </button>
+                    )}
+
+                    {/* Burglar's Spyglass */}
+                    {inspectTarget.item.id === 'brass_spyglass' && (
+                      <button
+                        id="btn-popup-use-spyglass"
+                        onClick={() => {
+                          setInspectTarget(null);
+                          onClose();
+                          onActivateMapAction?.('SPYGLASS');
+                        }}
+                        className="w-full py-2 bg-gradient-to-b from-[#1b4352] to-[#0f2830] hover:from-[#255c70] hover:to-[#143540] text-cyan-100 font-serif font-bold text-xs rounded-lg border border-cyan-400 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Compass className="w-4 h-4 text-cyan-300" />
+                        <span>Scout Adjacent Chamber [Reusable Tool]</span>
+                      </button>
+                    )}
+
+                    {/* Scroll of Clairvoyance */}
+                    {(inspectTarget.item.id === 'scroll_of_clairvoyance' ||
+                      inspectTarget.item.specialEffect === 'PEEK_ANY_ROOM') && (
+                      <button
+                        id="btn-popup-clairvoyance"
+                        onClick={() => {
+                          setInspectTarget(null);
+                          onClose();
+                          onActivateMapAction?.('CLAIRVOYANCE');
+                        }}
+                        className="w-full py-2 bg-gradient-to-b from-[#4d2566] to-[#2e143d] hover:from-[#663187] hover:to-[#3e1b52] text-purple-100 font-serif font-bold text-xs rounded-lg border border-purple-400 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Eye className="w-4 h-4 text-purple-300" />
+                        <span>Cast Clairvoyance ➔ Peek Any Map Tile [Single-use]</span>
+                      </button>
+                    )}
+
+                    {/* Wall Breaching Tools (Pickaxe / Sledge) */}
+                    {inspectTarget.item.specialEffect === 'SMASH_WALL' && (
+                      <button
+                        id="btn-popup-smash-wall"
+                        onClick={() => {
+                          setInspectTarget(null);
+                          onClose();
+                          onActivateMapAction?.('SMASH_WALL');
+                        }}
+                        className="w-full py-2 bg-gradient-to-b from-[#5c2419] to-[#38150e] hover:from-[#752e1f] hover:to-[#4a1c12] text-amber-200 font-serif font-bold text-xs rounded-lg border border-red-500 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Hammer className="w-4 h-4 text-amber-400" />
+                        <span>Smash Wall ➔ Open Dungeon Map</span>
+                      </button>
+                    )}
+
+                    {/* Wall Phasing Potion */}
+                    {inspectTarget.item.specialEffect === 'PHASE_WALL' && (
+                      <button
+                        id="btn-popup-phase-wall"
+                        onClick={() => {
+                          setInspectTarget(null);
+                          onClose();
+                          onActivateMapAction?.('PHASE_WALL');
+                        }}
+                        className="w-full py-2 bg-gradient-to-b from-[#3f2252] to-[#251330] hover:from-[#532d6b] hover:to-[#331a42] text-purple-200 font-serif font-bold text-xs rounded-lg border border-purple-400 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Sparkles className="w-4 h-4 text-purple-300" />
+                        <span>Phase Through Wall ➔ Open Dungeon Map [Single-use]</span>
+                      </button>
+                    )}
+
+                    {/* Drop and Cancel Row */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        id="btn-popup-drop-item"
+                        onClick={() => handleDropItem(inspectTarget.index)}
+                        className="flex-1 py-1.5 bg-[#2d1713] hover:bg-[#45221b] text-red-300 font-serif text-xs rounded-lg border border-red-800 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        <span>Drop Item (Free 1 Slot)</span>
+                      </button>
+
+                      <button
+                        id="btn-popup-cancel"
+                        onClick={() => setInspectTarget(null)}
+                        className="px-4 py-1.5 bg-[#291b10] hover:bg-[#3b2718] text-stone-300 font-serif text-xs rounded-lg border border-[#4d331f] transition-colors cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {inspectTarget.type === 'equipment' && (
+                  <>
+                    <button
+                      id="btn-popup-unequip-item"
+                      disabled={hero.inventory.length >= hero.maxInventorySlots}
+                      onClick={() => handleUnequipSlot(inspectTarget.slot)}
+                      className="w-full py-2 bg-[#422e1e] hover:bg-[#5c402a] text-amber-100 font-serif font-bold text-xs rounded-lg border border-[#785335] shadow transition-all cursor-pointer disabled:opacity-40"
+                    >
+                      {hero.inventory.length >= hero.maxInventorySlots
+                        ? 'Backpack is Full (Cannot Unequip)'
+                        : 'Unequip to Backpack'}
+                    </button>
+
+                    <button
+                      id="btn-popup-cancel-equipped"
+                      onClick={() => setInspectTarget(null)}
+                      className="w-full py-1.5 bg-[#291b10] hover:bg-[#3b2718] text-stone-300 font-serif text-xs rounded-lg border border-[#4d331f] transition-colors cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

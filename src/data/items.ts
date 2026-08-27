@@ -345,7 +345,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   minor_healing_potion: {
     id: 'minor_healing_potion',
     name: 'Minor Health Potion',
-    description: 'A crimson draught that instantly restores 12 HP.',
+    description: 'Single-use draught. Instantly restores 12 HP to your hero.',
     type: 'potion',
     rarity: 'common',
     value: 10,
@@ -357,7 +357,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   greater_healing_potion: {
     id: 'greater_healing_potion',
     name: 'Greater Health Elixir',
-    description: 'A luminescent ruby vial that restores 28 HP.',
+    description: 'Single-use elixir. A luminescent ruby vial that instantly restores 28 HP.',
     type: 'potion',
     rarity: 'uncommon',
     value: 25,
@@ -369,7 +369,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   mana_draught: {
     id: 'mana_draught',
     name: 'Mana Potion',
-    description: 'Effervescent sapphire liquid that restores 15 Mana.',
+    description: 'Single-use potion. Effervescent sapphire liquid that restores 15 Mana.',
     type: 'potion',
     rarity: 'common',
     value: 12,
@@ -381,7 +381,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   elixir_of_heroism: {
     id: 'elixir_of_heroism',
     name: 'Elixir of Heroism',
-    description: 'Restores 20 HP and 15 Mana, and cleanses negative status effects.',
+    description: 'Single-use grand elixir. Restores 20 HP and 15 Mana, and cleanses negative status effects.',
     type: 'potion',
     rarity: 'rare',
     value: 45,
@@ -394,7 +394,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   scroll_of_fireball: {
     id: 'scroll_of_fireball',
     name: 'Scroll of Fireball',
-    description: 'Unfurl this parchment to blast a monster for 3d8 fire damage.',
+    description: 'Single-use scroll. Unfurl this parchment in battle to blast a monster for 3d8 fire damage.',
     type: 'scroll',
     rarity: 'uncommon',
     value: 20,
@@ -406,7 +406,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   scroll_of_teleport: {
     id: 'scroll_of_teleport',
     name: 'Scroll of Escape',
-    description: 'Instantly teleports you safely out of combat back to the previous room.',
+    description: 'Single-use scroll. Instantly teleports you safely out of combat back to the previous room.',
     type: 'scroll',
     rarity: 'uncommon',
     value: 25,
@@ -417,7 +417,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   scroll_of_clairvoyance: {
     id: 'scroll_of_clairvoyance',
     name: 'Scroll of Clairvoyance',
-    description: 'Cast arcane sight to peek and reveal any room card on the 4x4 floor grid without moving.',
+    description: 'Single-use scroll. Cast arcane sight to peek and reveal any room card on the 4x4 floor grid without moving.',
     type: 'scroll',
     rarity: 'uncommon',
     value: 22,
@@ -429,7 +429,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   potion_of_phasing: {
     id: 'potion_of_phasing',
     name: 'Potion of Phasing',
-    description: 'Drink this spectral draught to slip through solid stone walls into any adjacent chamber.',
+    description: 'Single-use potion. Drink this spectral draught to slip through solid stone walls into any adjacent chamber.',
     type: 'potion',
     rarity: 'uncommon',
     value: 30,
@@ -443,7 +443,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   dungeon_ration: {
     id: 'dungeon_ration',
     name: 'Salted Beef & Hardtack',
-    description: 'Dry provisions to consume at campfires to replenish 8 HP.',
+    description: 'Single-use provisions. Dry ration pack consumed to replenish 8 HP.',
     type: 'tool',
     rarity: 'common',
     value: 4,
@@ -453,17 +453,17 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   },
   iron_lockpick: {
     id: 'iron_lockpick',
-    name: 'Masterwork Lockpick',
-    description: 'Grants +4 bonus on picking locked chests or dungeon doors.',
+    name: "Thieves' Lockpick Kit",
+    description: 'Reusable masterwork tool. Grants +3 on lockpicking checks and +2 on trap disarm checks. Does not get consumed on use.',
     type: 'tool',
-    rarity: 'common',
-    value: 8,
+    rarity: 'uncommon',
+    value: 25,
     icon: 'Key',
   },
   dungeon_torch: {
     id: 'dungeon_torch',
     name: 'Pitch Torch',
-    description: 'Illuminate and reveal an unrevealed adjacent room card not blocked by a solid wall.',
+    description: 'Single-use torch. Consumed when lit to illuminate and reveal an adjacent room card not blocked by a solid wall.',
     type: 'tool',
     rarity: 'common',
     value: 5,
@@ -474,7 +474,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   brass_spyglass: {
     id: 'brass_spyglass',
     name: "Burglar's Spyglass",
-    description: 'A collapsible brass scope that lets you peek and reveal any unobstructed adjacent room tile without consuming a torch.',
+    description: 'Reusable tool. A collapsible brass scope that lets you peek and reveal any unobstructed adjacent room tile without consuming torches.',
     type: 'tool',
     rarity: 'uncommon',
     value: 28,
@@ -485,7 +485,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   dwarven_sledgehammer: {
     id: 'dwarven_sledgehammer',
     name: 'Dwarven Breaching Sledge',
-    description: 'Heavy runic mallet capable of smashing interior stone walls into passable archways (2 charges).',
+    description: 'Runic mallet capable of smashing interior stone walls into passable archways (2 uses).',
     type: 'tool',
     rarity: 'rare',
     value: 45,
@@ -498,7 +498,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   miner_pickaxe: {
     id: 'miner_pickaxe',
     name: 'Heavy Iron Pickaxe',
-    description: 'Sturdy mining tool to break down a stone wall between rooms (1 charge).',
+    description: 'Single-use mining tool. Consumed when breaking down a solid stone wall between rooms.',
     type: 'tool',
     rarity: 'common',
     value: 18,
@@ -511,7 +511,7 @@ export const ITEMS_DATABASE: Record<string, GameItem> = {
   ethereal_ring: {
     id: 'ethereal_ring',
     name: 'Ring of the Ethereal Strider',
-    description: 'Shimmers with violet luminescence, granting the bearer the power to walk through walls at will.',
+    description: 'Reusable magic ring. Shimmers with violet luminescence, granting the bearer the power to walk through walls at will.',
     type: 'ring',
     rarity: 'rare',
     value: 85,

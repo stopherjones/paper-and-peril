@@ -85,7 +85,7 @@ export const HERO_CLASSES: ClassDefinition[] = [
     gearHighlights: [
       { name: 'Shadowfang Stiletto', type: 'Finesse Dagger', bonus: '1d6+3 Dmg (+3 DEX, +1 LCK)', icon: 'Zap' },
       { name: 'Padded Leather Tunic', type: 'Light Armor', bonus: '+1 Armor (+1 DEX)', icon: 'Shirt' },
-      { name: 'Iron Lockpicks (x3)', type: 'Thief Tools', bonus: '+3 Lockpick & Trap Kit', icon: 'Key' },
+      { name: "Thieves' Lockpick Kit", type: 'Reusable Tool', bonus: '+3 Lockpick & +2 Trap Disarm', icon: 'Key' },
     ],
     icon: 'Zap',
     skills: [
@@ -276,6 +276,7 @@ export const HERO_CLASSES: ClassDefinition[] = [
         manaCost: 6,
         cooldownTurns: 3,
         type: 'heal',
+        diceFormula: '15',
         icon: 'Heart',
       },
       {

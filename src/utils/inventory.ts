@@ -87,6 +87,17 @@ export function addItemToHero(
     };
   }
 
+  // Reusable Tools: If hero already owns a lockpick kit, convert duplicates to Gold to prevent slot clutter
+  if (item.id === 'iron_lockpick' && getItemCount(hero, 'iron_lockpick') > 0) {
+    const goldBonus = (item.value || 15) * quantity;
+    hero.gold += goldBonus;
+    return {
+      success: true,
+      message: `Already own a ${item.name}! Converted duplicate into +${goldBonus} Gold.`,
+      addedCount: quantity,
+    };
+  }
+
   const freeSlots = Math.max(0, hero.maxInventorySlots - hero.inventory.length);
   if (freeSlots <= 0) {
     return {

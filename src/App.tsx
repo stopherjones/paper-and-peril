@@ -55,6 +55,7 @@ import {
   consumeHeroTorch,
   syncHeroSupplies,
 } from './utils/inventory';
+import { getHeroSkillsForLevel } from './utils/skills';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>(() => {
@@ -596,20 +597,12 @@ export default function App() {
     hero.currentMana = hero.maxMana;
     hero.stats[chosenStat] += 2;
     
-    // Add Fate Die to inventory & sync
-    if (ITEMS_DATABASE['dice_of_fate']) {
-      addItemToHero(hero, ITEMS_DATABASE['dice_of_fate'], 1);
-    } else {
-      addItemToHero(hero, {
-        id: 'dice_of_fate',
-        name: 'Dice of Fate (Reroll Token)',
-        type: 'tool',
-        rarity: 'rare',
-        value: 30,
-        description: 'A mystical bone die that lets you reroll any attack or skill check.',
-        icon: 'Dices',
-      }, 1);
-    }
+    // Grant 1 Fate Reroll Token on level up
+    hero.rerollTokens = (hero.rerollTokens || 0) + 1;
+
+    // Upgrade Spells & Skills to match new Hero Level
+    hero.skills = getHeroSkillsForLevel(hero.classId, hero.level);
+
     syncHeroSupplies(hero);
 
     setPendingLevelUp(false);

@@ -111,7 +111,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
     }
 
     if (hero.gold < cost) {
-      setFeedback(`“Reinforcing and expanding your backpack with reinforced leather straps costs ${cost} Gold.”`);
+      setFeedback(`“Reinforcing and expanding your backpack with leather straps costs ${cost} Gold.”`);
       sounds.playBlock();
       return;
     }
@@ -122,6 +122,33 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
     setFeedback(`“Backpack expanded! Capacity increased to ${hero.maxInventorySlots} Slots (+5 Slots).”`);
     onUpdateHero({ ...hero });
   };
+
+  const getItemUsageBadge = (item: GameItem) => {
+    if (
+      item.type === 'potion' ||
+      item.type === 'scroll' ||
+      item.id === 'dungeon_torch' ||
+      item.id === 'dungeon_ration' ||
+      item.id === 'miner_pickaxe'
+    ) {
+      return { label: 'Single-use', bg: 'bg-amber-950/80 text-amber-300 border-amber-600/70' };
+    }
+    if (item.id === 'dwarven_sledgehammer') {
+      return { label: '2 Uses', bg: 'bg-orange-950/80 text-orange-300 border-orange-600/70' };
+    }
+    if (item.id === 'iron_lockpick' || item.id === 'brass_spyglass' || item.id === 'ethereal_ring') {
+      return { label: 'Reusable Tool', bg: 'bg-cyan-950/80 text-cyan-300 border-cyan-500/70' };
+    }
+    if (['weapon', 'shield', 'armor', 'helmet', 'boots', 'ring', 'amulet'].includes(item.type)) {
+      return { label: 'Equipment', bg: 'bg-stone-800 text-stone-300 border-stone-600' };
+    }
+    if (item.type === 'treasure') {
+      return { label: 'Treasure', bg: 'bg-yellow-950/80 text-yellow-300 border-yellow-500/70' };
+    }
+    return { label: 'Item', bg: 'bg-stone-800 text-stone-300 border-stone-600' };
+  };
+
+  const upgradeCost = getBackpackUpgradeCost();
 
   return (
     <div
@@ -146,7 +173,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
           <button
             id="btn-close-merchant"
             onClick={onClose}
-            className="p-1.5 hover:bg-[#3d2a1c] rounded-md text-stone-400 hover:text-stone-200 transition-colors"
+            className="p-1.5 hover:bg-[#3d2a1c] rounded-md text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -161,7 +188,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
                 setActiveTab('buy');
                 sounds.playBlock();
               }}
-              className={`px-3 py-1 rounded text-xs font-serif font-bold transition-all ${
+              className={`px-3 py-1 rounded text-xs font-serif font-bold transition-all cursor-pointer ${
                 activeTab === 'buy'
                   ? 'bg-[#dfb15b] text-[#241a12] shadow'
                   : 'bg-[#291c12] text-stone-300 hover:bg-[#3d2a1b]'
@@ -175,7 +202,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
                 setActiveTab('sell');
                 sounds.playBlock();
               }}
-              className={`px-3 py-1 rounded text-xs font-serif font-bold transition-all ${
+              className={`px-3 py-1 rounded text-xs font-serif font-bold transition-all cursor-pointer ${
                 activeTab === 'sell'
                   ? 'bg-[#dfb15b] text-[#241a12] shadow'
                   : 'bg-[#291c12] text-stone-300 hover:bg-[#3d2a1b]'
@@ -189,13 +216,13 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
                 setActiveTab('service');
                 sounds.playBlock();
               }}
-              className={`px-3 py-1 rounded text-xs font-serif font-bold transition-all ${
+              className={`px-3 py-1 rounded text-xs font-serif font-bold transition-all cursor-pointer ${
                 activeTab === 'service'
                   ? 'bg-[#dfb15b] text-[#241a12] shadow'
                   : 'bg-[#291c12] text-stone-300 hover:bg-[#3d2a1b]'
               }`}
             >
-              Rest & Heal
+              Rest & Heal (12G)
             </button>
           </div>
 
@@ -215,35 +242,87 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto pr-1">
           {activeTab === 'buy' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {stock.map((item) => {
-                const canAfford = hero.gold >= item.value;
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-[#1b130c] border border-[#4d3623] p-2.5 rounded-lg flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-serif font-bold text-xs text-amber-200">{item.name}</span>
-                        <span className="text-xs font-mono font-bold text-yellow-400">{item.value} G</span>
-                      </div>
-                      <p className="text-[11px] text-stone-300 font-serif leading-tight mb-2">
-                        {item.description}
-                      </p>
-                    </div>
-
-                    <button
-                      id={`btn-buy-${item.id}`}
-                      disabled={!canAfford}
-                      onClick={() => handleBuy(item)}
-                      className="w-full py-1 bg-[#3a2818] hover:bg-[#523922] text-amber-100 rounded text-xs font-serif font-bold border border-[#6b4b2b] transition-colors disabled:opacity-40"
-                    >
-                      {canAfford ? 'Buy' : 'Not enough Gold'}
-                    </button>
+            <div className="space-y-3">
+              {/* Featured Backpack Upgrade Card inside Buy Wares */}
+              <div className="bg-gradient-to-r from-[#24160d] to-[#1c120a] border-2 border-amber-600/80 p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-950/80 rounded-lg border border-amber-600/80 text-amber-400 shrink-0">
+                    <Package className="w-6 h-6" />
                   </div>
-                );
-              })}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-serif font-bold text-sm text-[#f5e4c6]">
+                        Reinforced Leather Rucksack
+                      </span>
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-900/60 border border-amber-500 text-amber-300">
+                        Backpack Upgrade
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-300 font-serif leading-tight mt-0.5">
+                      Expands your backpack capacity by +5 item slots (Current: {hero.inventory.length}/{hero.maxInventorySlots} slots used).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="w-full sm:w-auto shrink-0 flex items-center justify-end">
+                  {upgradeCost !== null ? (
+                    <button
+                      id="btn-buy-backpack-upgrade-main"
+                      disabled={hero.gold < upgradeCost}
+                      onClick={handleUpgradeBackpack}
+                      className="w-full sm:w-auto px-4 py-2 bg-gradient-to-b from-amber-600 to-amber-800 hover:from-amber-500 hover:to-amber-700 text-amber-100 font-serif font-bold text-xs rounded border border-amber-400 shadow cursor-pointer disabled:opacity-40 whitespace-nowrap"
+                    >
+                      Expand +5 Slots ({upgradeCost} Gold)
+                    </button>
+                  ) : (
+                    <span className="text-xs font-mono text-emerald-400 font-bold px-3 py-1 bg-[#120b07] border border-[#3b2716] rounded">
+                      ✓ Max Capacity (30 Slots)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Standard Item Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {stock.map((item) => {
+                  const canAfford = hero.gold >= item.value;
+                  const badge = getItemUsageBadge(item);
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-[#1b130c] border border-[#4d3623] p-2.5 rounded-lg flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-serif font-bold text-xs text-amber-200">{item.name}</span>
+                          <span className="text-xs font-mono font-bold text-yellow-400">{item.value} G</span>
+                        </div>
+
+                        <div className="mb-1.5">
+                          <span
+                            className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${badge.bg}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-stone-300 font-serif leading-tight mb-2">
+                          {item.description}
+                        </p>
+                      </div>
+
+                      <button
+                        id={`btn-buy-${item.id}`}
+                        disabled={!canAfford}
+                        onClick={() => handleBuy(item)}
+                        className="w-full py-1 bg-[#3a2818] hover:bg-[#523922] text-amber-100 rounded text-xs font-serif font-bold border border-[#6b4b2b] transition-colors disabled:opacity-40 cursor-pointer"
+                      >
+                        {canAfford ? `Buy (${item.value}G)` : 'Not enough Gold'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -257,15 +336,21 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {hero.inventory.map((inv, idx) => {
                     const sellPrice = Math.max(1, Math.floor(inv.item.value * 0.6));
+                    const badge = getItemUsageBadge(inv.item);
                     return (
                       <div
                         key={idx}
-                        className="bg-[#1b130c] border border-[#4d3623] p-2.5 rounded-lg flex items-center justify-between"
+                        className="bg-[#1b130c] border border-[#4d3623] p-2.5 rounded-lg flex items-center justify-between gap-2"
                       >
                         <div>
-                          <span className="font-serif font-bold text-xs text-amber-200 block">
-                            {inv.item.name}
-                          </span>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="font-serif font-bold text-xs text-amber-200 block">
+                              {inv.item.name}
+                            </span>
+                            <span className={`text-[8px] font-mono px-1 py-0.2 rounded border ${badge.bg}`}>
+                              {badge.label}
+                            </span>
+                          </div>
                           <span className="text-[10px] text-stone-400 font-serif">
                             Value: {sellPrice} Gold (1 Slot)
                           </span>
@@ -274,7 +359,7 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
                         <button
                           id={`btn-sell-${inv.item.id}-${idx}`}
                           onClick={() => handleSell(idx)}
-                          className="px-3 py-1 bg-[#472d17] hover:bg-[#613e20] text-amber-100 rounded text-xs font-serif font-bold border border-[#784e27] transition-colors cursor-pointer"
+                          className="px-3 py-1 bg-[#472d17] hover:bg-[#613e20] text-amber-100 rounded text-xs font-serif font-bold border border-[#784e27] transition-colors cursor-pointer shrink-0"
                         >
                           Sell (+{sellPrice}G)
                         </button>
@@ -287,60 +372,21 @@ export const MerchantModal: React.FC<MerchantModalProps> = ({
           )}
 
           {activeTab === 'service' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Tavern Rest */}
-              <div className="bg-[#1b130c] border border-[#4d3623] p-3.5 rounded-lg flex flex-col justify-between text-center space-y-2">
-                <Heart className="w-6 h-6 text-red-400 mx-auto" />
-                <div>
-                  <h3 className="text-sm font-serif font-bold text-[#f5e4c6]">Tavern Hearth & Bandages</h3>
-                  <p className="text-[11px] text-stone-300 font-serif leading-tight mt-1">
-                    Hot herbal tonic and fresh bandages. Instantly restores 100% of your Hit Points and Mana.
-                  </p>
-                </div>
-                <div className="pt-2">
-                  <div className="font-mono text-xs text-yellow-300 font-bold mb-1.5">Cost: 12 Gold</div>
-                  <button
-                    id="btn-buy-tavern-rest"
-                    disabled={hero.gold < 12}
-                    onClick={handleMerchantRest}
-                    className="w-full py-1.5 bg-gradient-to-b from-[#8f6437] to-[#593b1d] hover:from-[#a67440] hover:to-[#6d4924] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] shadow disabled:opacity-40 cursor-pointer"
-                  >
-                    Pay 12 Gold & Rest
-                  </button>
-                </div>
-              </div>
-
-              {/* Backpack Expansion */}
-              <div className="bg-[#1b130c] border border-[#4d3623] p-3.5 rounded-lg flex flex-col justify-between text-center space-y-2">
-                <Package className="w-6 h-6 text-amber-400 mx-auto" />
-                <div>
-                  <h3 className="text-sm font-serif font-bold text-[#f5e4c6]">Reinforced Leather Rucksack</h3>
-                  <p className="text-[11px] text-stone-300 font-serif leading-tight mt-1">
-                    Olaf adds sturdy leather pouches and strap reinforcements (+5 Max Backpack Slots).
-                  </p>
-                </div>
-                <div className="pt-2">
-                  {getBackpackUpgradeCost() !== null ? (
-                    <>
-                      <div className="font-mono text-xs text-yellow-300 font-bold mb-1.5">
-                        Capacity: {hero.maxInventorySlots} ➔ {hero.maxInventorySlots + 5} Slots ({getBackpackUpgradeCost()} Gold)
-                      </div>
-                      <button
-                        id="btn-upgrade-backpack"
-                        disabled={hero.gold < getBackpackUpgradeCost()!}
-                        onClick={handleUpgradeBackpack}
-                        className="w-full py-1.5 bg-gradient-to-b from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-amber-100 font-serif font-bold text-xs rounded border border-amber-500 shadow disabled:opacity-40 cursor-pointer"
-                      >
-                        Expand (+5 Slots) — {getBackpackUpgradeCost()}G
-                      </button>
-                    </>
-                  ) : (
-                    <div className="p-2 bg-[#120b07] border border-[#3b2716] rounded text-xs font-mono text-emerald-400 font-bold">
-                      ✓ Maximum Capacity Reached ({hero.maxInventorySlots} Slots)
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="bg-[#1b130c] border border-[#4d3623] p-4 rounded-lg text-center space-y-3 max-w-md mx-auto">
+              <Heart className="w-8 h-8 text-red-400 mx-auto" />
+              <h3 className="text-base font-serif font-bold text-[#f5e4c6]">Tavern Hearth & Bandages</h3>
+              <p className="text-xs text-stone-300 font-serif leading-relaxed">
+                Olaf brews a hot herbal tonic and expertly dresses all your wounds. Instantly restores 100% of your Hit Points and Mana.
+              </p>
+              <div className="font-mono text-sm text-yellow-300 font-bold">Cost: 12 Gold</div>
+              <button
+                id="btn-buy-tavern-rest"
+                disabled={hero.gold < 12}
+                onClick={handleMerchantRest}
+                className="px-6 py-2 bg-gradient-to-b from-[#8f6437] to-[#593b1d] hover:from-[#a67440] hover:to-[#6d4924] text-amber-100 font-serif font-bold text-xs rounded border border-[#dfb15b] shadow disabled:opacity-40 cursor-pointer"
+              >
+                Pay 12 Gold & Rest
+              </button>
             </div>
           )}
         </div>

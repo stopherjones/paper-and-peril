@@ -36,6 +36,7 @@ import { CharacterStats, HeroCharacter, HeroClassId, StatType } from '../types/g
 import { HERO_CLASSES } from '../data/classes';
 import { ITEMS_DATABASE } from '../data/items';
 import { syncHeroSupplies } from '../utils/inventory';
+import { getHeroSkillsForLevel } from '../utils/skills';
 import {
   CHARACTER_CLASS_TABLE,
   STARTING_BOON_TABLE,
@@ -254,7 +255,6 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
 
     // Apply Boon
     let startingGold = selectedClass.startingGold;
-    let extraLockpicks = selectedClassId === 'rogue' ? 3 : 2;
     let extraRations = 3;
     let extraTorches = 2;
     let extraRerollTokens = selectedClassId === 'rogue' ? 2 : 1;
@@ -263,7 +263,9 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
 
     if (activeBoon) {
       if (activeBoon.type === 'gold') startingGold += activeBoon.value;
-      if (activeBoon.type === 'lockpicks') extraLockpicks += activeBoon.value;
+      if (activeBoon.type === 'lockpicks') {
+        startingGold += 15; // Boon bonus gold along with masterwork kit
+      }
       if (activeBoon.type === 'supplies') {
         extraRations += 3;
         extraTorches += 2;
@@ -281,15 +283,18 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
       }
     }
 
+    // Lockpicks are a single reusable masterwork tool:
+    // If the hero has a lockpick from class equipment or boon, ensure they have exactly 1 reusable lockpick set.
+    const alreadyHasLockpick = inventory.some((inv) => inv.item.id === 'iron_lockpick');
+    const deservesLockpick = alreadyHasLockpick || selectedClassId === 'rogue' || selectedClassId === 'ranger' || (activeBoon && activeBoon.type === 'lockpicks');
+    if (deservesLockpick && !alreadyHasLockpick && ITEMS_DATABASE['iron_lockpick']) {
+      inventory.push({ item: ITEMS_DATABASE['iron_lockpick'], quantity: 1 });
+    }
+
     // Add physical supplies into backpack inventory (each takes 1 slot)
     for (let i = 0; i < extraRations; i++) {
       if (ITEMS_DATABASE['dungeon_ration']) {
         inventory.push({ item: ITEMS_DATABASE['dungeon_ration'], quantity: 1 });
-      }
-    }
-    for (let i = 0; i < extraLockpicks; i++) {
-      if (ITEMS_DATABASE['iron_lockpick']) {
-        inventory.push({ item: ITEMS_DATABASE['iron_lockpick'], quantity: 1 });
       }
     }
     for (let i = 0; i < extraTorches; i++) {
@@ -317,8 +322,8 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
       rerollTokens: extraRerollTokens,
       rations: extraRations,
       torches: extraTorches,
-      lockpicks: extraLockpicks,
-      skills: [...selectedClass.skills],
+      lockpicks: inventory.filter((inv) => inv.item.id === 'iron_lockpick').length,
+      skills: getHeroSkillsForLevel(selectedClass.id, 1),
       activeEffects: [],
       statsHistory: {
         roomsExplored: 1,

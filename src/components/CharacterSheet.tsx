@@ -248,13 +248,23 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
         </div>
       </div>
 
-      {/* Wealth & Coin Purse */}
-      <div className="flex items-center justify-between bg-[#171008] px-2.5 py-1.5 rounded-lg border border-amber-600/60 mb-2.5 shadow-inner">
-        <div className="flex items-center gap-1.5">
-          <Coins className="w-4 h-4 text-yellow-400" />
-          <span className="text-[11px] font-serif text-amber-200/90 uppercase font-bold">Purse & Wealth:</span>
+      {/* Wealth & Fate Currency */}
+      <div className="grid grid-cols-2 gap-2 mb-2.5">
+        <div className="flex items-center justify-between bg-[#171008] px-2.5 py-1.5 rounded-lg border border-amber-600/60 shadow-inner">
+          <div className="flex items-center gap-1.5">
+            <Coins className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+            <span className="text-[10px] font-serif text-amber-200/90 uppercase font-bold">Gold:</span>
+          </div>
+          <span className="text-xs font-mono font-bold text-yellow-300">{hero.gold} GP</span>
         </div>
-        <span className="text-xs font-mono font-bold text-yellow-300">{hero.gold} Gold Pieces (GP)</span>
+
+        <div className="flex items-center justify-between bg-[#1b1226] px-2.5 py-1.5 rounded-lg border border-purple-500/60 shadow-inner">
+          <div className="flex items-center gap-1.5">
+            <Dices className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span className="text-[10px] font-serif text-purple-200/90 uppercase font-bold">Fate:</span>
+          </div>
+          <span className="text-xs font-mono font-bold text-purple-200">{hero.rerollTokens} Tokens</span>
+        </div>
       </div>
 
       {/* Backpack Storage & Physical Items */}
@@ -300,8 +310,6 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                   <Key className="w-3 h-3 text-cyan-400 shrink-0" />
                 ) : inv.item.id === 'dungeon_torch' ? (
                   <Flame className="w-3 h-3 text-orange-400 shrink-0" />
-                ) : inv.item.id === 'dice_of_fate' ? (
-                  <Dices className="w-3 h-3 text-purple-400 shrink-0" />
                 ) : inv.item.type === 'potion' ? (
                   <Heart className="w-3 h-3 text-red-400 shrink-0" />
                 ) : inv.item.type === 'scroll' ? (
@@ -313,11 +321,9 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                 )}
                 <span className="font-serif truncate font-bold text-amber-100/90">{inv.item.name}</span>
               </div>
-              {inv.quantity > 1 && (
-                <span className="text-[9px] font-mono text-amber-400 font-bold bg-[#291a0f] px-1 py-0.2 rounded border border-[#4a2e19] shrink-0">
-                  x{inv.quantity}
-                </span>
-              )}
+              <span className="text-[9px] font-mono text-yellow-400/80 shrink-0">
+                {inv.item.value}g
+              </span>
             </div>
           ))}
 

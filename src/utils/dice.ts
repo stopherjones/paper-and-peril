@@ -104,6 +104,22 @@ export function parseAndRollFormula(
     }
   }
 
+  // Check if formula is a static number (e.g. "15", "20")
+  const staticNumMatch = clean.match(/^(\d+)$/);
+  if (staticNumMatch) {
+    const flatVal = parseInt(staticNumMatch[1], 10) + statMod + extraBonus;
+    return {
+      diceCount: 1,
+      diceSides: flatVal,
+      individualRolls: [flatVal],
+      modifier: 0,
+      total: flatVal,
+      isCrit: false,
+      isFumble: false,
+      formulaString: `${flatVal}`,
+    };
+  }
+
   // Match NdS+M or NdS-M or NdS
   const match = clean.match(/^(\d+)d(\d+)(?:([+-])(\d+))?$/i);
   if (!match) {

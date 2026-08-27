@@ -23,8 +23,18 @@ import {
   AlertTriangle,
   Footprints,
   Check,
+  Trophy,
 } from 'lucide-react';
-import { CombatLogEntry, CombatState, GameItem, HeroCharacter, HeroSkill, Monster, StatType } from '../types/game';
+import {
+  CombatLogEntry,
+  CombatState,
+  GameItem,
+  HeroCharacter,
+  HeroSkill,
+  Monster,
+  StatType,
+  StatusEffect,
+} from '../types/game';
 import { ITEMS_DATABASE } from '../data/items';
 import { DiceVisualizer } from './DiceVisualizer';
 import { rollDice, getStatModifier, parseAndRollFormula, RollResult } from '../utils/dice';
@@ -103,9 +113,20 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }
   });
 
+  // Include active status effects / buffs in hero AC (e.g. Iron Guard +4 AC, Hunter's Focus +4 AC)
+  if (hero.activeEffects && hero.activeEffects.length > 0) {
+    hero.activeEffects.forEach((eff) => {
+      if (eff.armorModifier) heroAc += eff.armorModifier;
+    });
+  }
+
   if (combat.heroDefending) {
     heroAc += 4; // Block stance
   }
+
+  // Active attack modifier from buffs (e.g. +3 Divine Favor)
+  const buffAttackBonus = (hero.activeEffects || []).reduce((sum, eff) => sum + (eff.attackModifier || 0), 0);
+  const buffCritBonus = (hero.activeEffects || []).reduce((sum, eff) => sum + (eff.critModifier || 0), 0);
 
   const strMod = getStatModifier(heroStats.STR);
   const dexMod = getStatModifier(heroStats.DEX);
@@ -132,8 +153,91 @@ export const CombatView: React.FC<CombatViewProps> = ({
   const weaponItemBonus = primaryWeapon?.bonusDamage || 0;
   const weaponFormula = primaryWeapon?.damageDice || '1d4';
   const weaponBonus = weaponItemBonus + weaponStatMod;
-  const totalWeaponAtkMod = weaponStatMod + weaponItemBonus;
-  const weaponStatBreakdown = `${weaponStatMod >= 0 ? `+${weaponStatMod}` : weaponStatMod} ${weaponStatKey}${weaponItemBonus ? ` +${weaponItemBonus} Wpn` : ''}`;
+  const totalWeaponAtkMod = weaponStatMod + weaponItemBonus + buffAttackBonus;
+  const weaponStatBreakdown = `${weaponStatMod >= 0 ? `+${weaponStatMod}` : weaponStatMod} ${weaponStatKey}${weaponItemBonus ? ` +${weaponItemBonus} Wpn` : ''}${buffAttackBonus ? ` +${buffAttackBonus} Buff` : ''}`;
+
+  // Dynamic Defensive Guard & Counter-Attack Profile based on Hero Class & Equipment
+  const getGuardProfile = () => {
+    const hasShield = Boolean(hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus);
+    const shieldName = hero.equipment.shield?.name || hero.equipment.offhand?.name || 'Shield';
+    const weaponName = primaryWeapon?.name || 'Weapon';
+    const weaponDice = primaryWeapon?.damageDice || '1d8';
+    const shieldAbsorb = 3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0);
+
+    switch (hero.classId) {
+      case 'warrior':
+        return {
+          actionName: hasShield ? 'Shield Guard & Riposte' : 'Iron Guard & Counter-Strike',
+          actionSubtitle: `+4 AC, Absorbs ${shieldAbsorb} Dmg & Ripostes`,
+          counterName: hasShield ? 'Shield Bash Riposte' : 'Heavy Blade Riposte',
+          counterDescription: hasShield
+            ? `Absorb the blow with ${shieldName} and execute a retaliatory ${weaponName} riposte strike!`
+            : `Parry the attack with ${weaponName} and deliver a crushing counter-strike!`,
+          counterFormula: weaponDice,
+          counterBonus: strMod + weaponItemBonus,
+          counterStatKey: 'STR' as StatType,
+          sound: 'hit' as const,
+        };
+      case 'rogue':
+        return {
+          actionName: 'Shadow Parry & Riposte',
+          actionSubtitle: `+4 AC, Absorbs 3 Dmg & Finesse Riposte`,
+          counterName: 'Shadowfang Riposte',
+          counterDescription: `Sidestep the enemy blow and plunge ${weaponName} into exposed vitals with lethal precision!`,
+          counterFormula: primaryWeapon?.damageDice || '1d6',
+          counterBonus: dexMod + weaponItemBonus,
+          counterStatKey: 'DEX' as StatType,
+          sound: 'hit' as const,
+        };
+      case 'wizard':
+        return {
+          actionName: 'Arcane Ward & Shockwave',
+          actionSubtitle: `+4 AC, Absorbs 3 Dmg & Kinetic Burst`,
+          counterName: 'Arcane Ward Shockwave',
+          counterDescription: `Runic barrier deflects the strike and unleashes a retaliatory burst of raw arcane kinetic force!`,
+          counterFormula: '1d6',
+          counterBonus: intMod,
+          counterStatKey: 'INT' as StatType,
+          sound: 'fire' as const,
+        };
+      case 'cleric':
+        return {
+          actionName: 'Sacred Bulwark & Retribution',
+          actionSubtitle: `+4 AC, Absorbs ${shieldAbsorb} Dmg & Divine Retribution`,
+          counterName: 'Radiant Retribution Strike',
+          counterDescription: `Consecrated bulwark rebounds holy fire upon the attacker and counters with ${weaponName}!`,
+          counterFormula: weaponDice,
+          counterBonus: Math.max(conMod, strMod) + weaponItemBonus,
+          counterStatKey: (conMod >= strMod ? 'CON' : 'STR') as StatType,
+          sound: 'fire' as const,
+        };
+      case 'paladin':
+        return {
+          actionName: 'Righteous Bastion & Sunblade Riposte',
+          actionSubtitle: `+4 AC, Absorbs ${shieldAbsorb} Dmg & Consecrated Riposte`,
+          counterName: 'Sunblade Retaliation Riposte',
+          counterDescription: `Lock shields against the blow and cleave the enemy with consecrated sunblade fury!`,
+          counterFormula: weaponDice,
+          counterBonus: strMod + weaponItemBonus,
+          counterStatKey: 'STR' as StatType,
+          sound: 'hit' as const,
+        };
+      case 'ranger':
+      default:
+        return {
+          actionName: 'Skirmish Deflection & Snap Shot',
+          actionSubtitle: `+4 AC, Absorbs 3 Dmg & Point-Blank Shot`,
+          counterName: 'Point-Blank Snap Counter',
+          counterDescription: `Deflect incoming attack and instantly loose a point-blank retaliatory strike!`,
+          counterFormula: weaponDice,
+          counterBonus: dexMod + weaponItemBonus,
+          counterStatKey: 'DEX' as StatType,
+          sound: 'hit' as const,
+        };
+    }
+  };
+
+  const guardProfile = getGuardProfile();
 
   // Helper to compute deep breakdown for any skill
   const getSkillDetails = (skill: HeroSkill) => {
@@ -167,7 +271,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
       isAutoHit = true;
     }
 
-    const totalAtkMod = statMod + extraAccuracy;
+    const totalAtkMod = statMod + extraAccuracy + buffAttackBonus;
 
     // Parse base dice from formula
     const match = skill.diceFormula?.match(/^(\d+d\d+)/i);
@@ -430,7 +534,8 @@ export const CombatView: React.FC<CombatViewProps> = ({
     if (skill.type === 'heal') {
       setCombatStep('HERO_ATTACK_ROLLING');
       sounds.playMagic();
-      const healRoll = parseAndRollFormula(skill.diceFormula || '1d8+INT', heroStats);
+      const formulaToUse = skill.id === 'lay_on_hands' ? String(10 + hero.level * 5) : (skill.diceFormula || '1d8+INT');
+      const healRoll = parseAndRollFormula(formulaToUse, heroStats);
       setCurrentRoll(healRoll);
 
       setTimeout(() => {
@@ -440,7 +545,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
         setActionSummary({
           title: `${skill.name} Cast!`,
-          details: `Channeled restorative light! Rolled ${healRoll.formulaString} = ${healed} HP restored. Current HP: ${hero.currentHp} / ${hero.maxHp}.`,
+          details: `Channeled sacred vitality! Restored ${healed} Hit Points. Current HP: ${hero.currentHp} / ${hero.maxHp}.`,
           type: 'hero',
         });
 
@@ -453,14 +558,115 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }
 
     if (skill.type === 'buff') {
-      combat.heroDefending = true;
+      const activeEffects = [...(hero.activeEffects || [])];
+      let newEffect: StatusEffect | null = null;
+
+      if (skill.id === 'bulwark') {
+        const dmgRed = 4 + (hero.level - 1) * 2;
+        newEffect = {
+          id: 'bulwark',
+          name: 'Aura of Protection',
+          description: `Radiant holy barrier reducing all incoming monster damage by ${dmgRed}`,
+          durationTurns: 3,
+          type: 'buff',
+          damageReduction: dmgRed,
+          icon: 'ShieldCheck',
+        };
+      } else if (skill.id === 'shield_wall') {
+        const acMod = 3 + hero.level;
+        const dmgRed = 2 + hero.level;
+        newEffect = {
+          id: 'shield_wall',
+          name: 'Iron Guard',
+          description: `Fortified stance granting +${acMod} Armor Class & absorbing ${dmgRed} damage`,
+          durationTurns: 2,
+          type: 'buff',
+          armorModifier: acMod,
+          damageReduction: dmgRed,
+          icon: 'Shield',
+        };
+      } else if (skill.id === 'survival_instinct') {
+        const acMod = 3 + hero.level;
+        const critMod = 0.10 + hero.level * 0.05;
+        newEffect = {
+          id: 'survival_instinct',
+          name: "Hunter's Focus",
+          description: `Sharpened senses granting +${acMod} Armor Class and +${Math.round(critMod * 100)}% Critical Chance`,
+          durationTurns: 3,
+          type: 'buff',
+          armorModifier: acMod,
+          critModifier: critMod,
+          icon: 'Zap',
+        };
+      } else if (skill.id === 'holy_blessing') {
+        const atkMod = 2 + hero.level;
+        newEffect = {
+          id: 'holy_blessing',
+          name: 'Divine Favor',
+          description: `Holy blessing granting +${atkMod} to all attack rolls and saving checks`,
+          durationTurns: 3,
+          type: 'buff',
+          attackModifier: atkMod,
+          icon: 'Sparkles',
+        };
+      } else if (skill.id === 'mana_shield') {
+        const shieldVal = 12 + hero.level * 8;
+        newEffect = {
+          id: 'mana_shield',
+          name: 'Arcane Barrier',
+          description: `Mystic force barrier absorbing up to ${shieldVal} damage before breaking`,
+          durationTurns: 4,
+          type: 'buff',
+          shieldHp: shieldVal,
+          maxShieldHp: shieldVal,
+          icon: 'Shield',
+        };
+      } else if (skill.id === 'smoke_bomb') {
+        const evasion = Math.min(0.95, 0.70 + hero.level * 0.05);
+        newEffect = {
+          id: 'smoke_bomb',
+          name: 'Shadow Evasion',
+          description: `Dense smoke screen providing ${Math.round(evasion * 100)}% evasion against enemy attacks`,
+          durationTurns: 2,
+          type: 'buff',
+          evasionBonus: evasion,
+          icon: 'Wind',
+        };
+      } else if (skill.id === 'poison_blade') {
+        const toxDmg = 2 + hero.level * 2;
+        newEffect = {
+          id: 'poison_blade',
+          name: 'Venom Coating',
+          description: `Coats weapon in viper venom dealing +${toxDmg} extra poison damage`,
+          durationTurns: 3,
+          type: 'buff',
+          damagePerTurn: toxDmg,
+          icon: 'FlaskRound',
+        };
+      } else {
+        newEffect = {
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          durationTurns: 3,
+          type: 'buff',
+          armorModifier: 4,
+          icon: 'Shield',
+        };
+      }
+
+      // Replace existing buff of same id or append
+      const filtered = activeEffects.filter((e) => e.id !== newEffect!.id);
+      filtered.push(newEffect);
+      hero.activeEffects = filtered;
+
       sounds.playBlock();
       setActionSummary({
         title: `${skill.name} Activated!`,
-        details: detail.boxText,
+        details: `${detail.boxText}\n\n✨ ACTIVE PROTECTION: Effect will remain active for ${newEffect.durationTurns} turns, persisting across rounds with full damage reductions & modifiers.`,
         type: 'hero',
       });
-      addLog('hero', skill.name, `Activated ${skill.name} (${detail.rollSubtitle}).`);
+      addLog('hero', skill.name, `Activated ${skill.name} (${newEffect.durationTurns} turns active).`);
       onUpdateHero({ ...hero });
       onUpdateCombat({ ...combat });
       setCombatStep('HERO_NON_DAMAGE_RESULT');
@@ -544,19 +750,21 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }, 600);
   };
 
-  // 4. HERO DEFEND STANCE
+  // 4. HERO DEFEND STANCE & COUNTER-ATTACK
   const handleHeroDefend = () => {
     if (combatStep !== 'HERO_CHOICE') return;
     combat.heroDefending = true;
     sounds.playBlock();
 
+    const shieldAbsorb = 3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0);
+
     setActionSummary({
-      title: 'Defensive Guard Raised',
-      details: `Raised shield and braced for impact: +4 Armor Class (Your AC ${heroAc} ➔ ${heroAc + 4}) and reduces all incoming monster damage by 3 this round.`,
+      title: `${guardProfile.actionName} Activated`,
+      details: `🛡️ DEFENSIVE STANCE ACTIVE:\n• Fortified Defenses: +4 Armor Class (Your AC ${heroAc} ➔ ${heroAc + 4})\n• Damage Absorption: Absorbs ${shieldAbsorb} incoming monster damage\n• ⚔️ COUNTER-ATTACK PRIMED: Ready to execute a retaliatory ${guardProfile.counterName} (${guardProfile.counterFormula} + ${guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} ${guardProfile.counterStatKey}) when ${monster.name} attacks!`,
       type: 'hero',
     });
 
-    addLog('hero', 'Defensive Guard', 'Raised shield for +4 AC & 3 dmg reduction.');
+    addLog('hero', guardProfile.actionName, `Raised defense (+4 AC, -${shieldAbsorb} dmg) & primed ${guardProfile.counterName}.`);
     onUpdateCombat({ ...combat });
     setCombatStep('HERO_NON_DAMAGE_RESULT');
   };
@@ -768,19 +976,58 @@ export const CombatView: React.FC<CombatViewProps> = ({
     setCurrentRoll(atkRoll);
 
     setTimeout(() => {
-      // Monster Attack Evaluation
-      if (atkRoll.isFumble) {
+      // Check Active Evasion Buffs (e.g. Smoke Bomb 75% evasion)
+      const evasionBuff = (hero.activeEffects || []).find((e) => e.evasionBonus && e.evasionBonus > 0);
+      const isEvaded = Boolean(evasionBuff && Math.random() < (evasionBuff.evasionBonus || 0));
+
+      if (isEvaded && evasionBuff) {
+        sounds.playBlock();
+        setActionSummary({
+          title: `✦ ${evasionBuff.name.toUpperCase()} EVASION!`,
+          details: `${monster.name} attacked with ${action.name} (Roll ${atkRoll.total}), but you vanished into the shadows and completely evaded the strike!`,
+          isHit: false,
+          type: 'monster',
+        });
+        addLog('hero', evasionBuff.name, `Completely evaded ${monster.name}'s attack using ${evasionBuff.name}!`);
+      } else if (atkRoll.isFumble) {
         // Monster Critical Fumble (Natural 1)
         combat.monsterStumbled = true;
         sounds.playBlock();
 
-        setActionSummary({
-          title: 'CRITICAL ENEMY FUMBLE! (Natural 1)',
-          details: `${monster.name} rolled a Natural 1 and slipped on the dungeon stones! The creature is STAGGERED and completely botched its attack, dealing 0 damage and leaving its guard wide open (+2 Advantage to your next attack roll)!`,
-          isHit: false,
-          isFumble: true,
-          type: 'monster',
-        });
+        // Check if Hero was Defending -> Trigger Counter-Attack
+        if (combat.heroDefending) {
+          const counterRes = parseAndRollFormula(guardProfile.counterFormula, heroStats, guardProfile.counterBonus);
+          const counterDmg = Math.max(1, counterRes.total);
+          monster.hp = Math.max(0, monster.hp - counterDmg);
+
+          if (guardProfile.sound === 'fire') sounds.playFire();
+          else sounds.playHit();
+
+          setActionSummary({
+            title: `CRITICAL ENEMY FUMBLE & ${guardProfile.counterName.toUpperCase()}!`,
+            details: `💥 ENEMY FUMBLE (Natural 1): ${monster.name} slipped and stumbled, completely botching its attack (dealing 0 damage & granting you +2 Advantage next turn)!\n\n⚔️ RETALIATORY COUNTER-ATTACK: Seizing the monster's blunder, you struck back with ${guardProfile.counterName} (${counterRes.formulaString} = ${counterDmg} damage)!${monster.hp <= 0 ? `\n\n💀 ${monster.name.toUpperCase()} HAS BEEN SLAIN BY YOUR COUNTER-ATTACK!` : ''}`,
+            damage: 0,
+            isHit: false,
+            isFumble: true,
+            type: 'monster',
+          });
+
+          addLog(
+            'hero',
+            `Counter-Attack: ${guardProfile.counterName}`,
+            `Retaliated against stumbled ${monster.name} for ${counterDmg} damage!`,
+            undefined,
+            counterDmg
+          );
+        } else {
+          setActionSummary({
+            title: 'CRITICAL ENEMY FUMBLE! (Natural 1)',
+            details: `${monster.name} rolled a Natural 1 and slipped on the dungeon stones! The creature is STAGGERED and completely botched its attack, dealing 0 damage and leaving its guard wide open (+2 Advantage to your next attack roll)!`,
+            isHit: false,
+            isFumble: true,
+            type: 'monster',
+          });
+        }
 
         addLog(
           'monster',
@@ -797,45 +1044,126 @@ export const CombatView: React.FC<CombatViewProps> = ({
         );
       } else {
         const isHit = atkRoll.isCrit || atkRoll.total >= heroAc;
-        let dmg = 0;
 
         if (isHit) {
-          const dmgRes = parseAndRollFormula(action.damageDice);
-          const baseDmg = dmgRes.total;
-          dmg = baseDmg;
+          const actionDice = action.damageDice || '1d6';
+          const dmgRes = parseAndRollFormula(actionDice);
+          const rawBaseDmg = dmgRes.total;
+          let calculatedDmg = rawBaseDmg;
 
           if (atkRoll.isCrit) {
             // Monster Critical Strike: 1.5x damage + 2 brutality
-            dmg = Math.floor(baseDmg * 1.5) + 2;
+            calculatedDmg = Math.floor(rawBaseDmg * 1.5) + 2;
             sounds.playCriticalHit();
           } else {
             sounds.playHit();
           }
 
-          if (combat.heroDefending) {
-            dmg = Math.max(1, dmg - 3);
+          // Damage Reduction from Active Buffs (e.g. Aura of Protection -4, Iron Guard -3)
+          const activeBuffDmgReduction = (hero.activeEffects || []).reduce((sum, eff) => sum + (eff.damageReduction || 0), 0);
+          const guardReduction = combat.heroDefending ? (3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)) : 0;
+          const totalReduction = activeBuffDmgReduction + guardReduction;
+
+          let dmgAfterReduction = Math.max(0, calculatedDmg - totalReduction);
+
+          // Check Arcane Barrier (shieldHp absorption)
+          let absorbedByShield = 0;
+          const manaShieldEff = (hero.activeEffects || []).find((e) => e.id === 'mana_shield' && e.shieldHp && e.shieldHp > 0);
+          if (manaShieldEff && manaShieldEff.shieldHp) {
+            absorbedByShield = Math.min(manaShieldEff.shieldHp, dmgAfterReduction);
+            manaShieldEff.shieldHp -= absorbedByShield;
+            dmgAfterReduction = Math.max(0, dmgAfterReduction - absorbedByShield);
+          }
+
+          const finalDmgTaken = dmgAfterReduction;
+          hero.currentHp = Math.max(0, hero.currentHp - finalDmgTaken);
+
+          // Build reduction breakdown string
+          const reductionDetails: string[] = [];
+          if (activeBuffDmgReduction > 0) {
+            const buffNames = (hero.activeEffects || []).filter((e) => (e.damageReduction || 0) > 0).map((e) => `${e.name} (-${e.damageReduction} Dmg)`).join(', ');
+            reductionDetails.push(buffNames);
+          }
+          if (guardReduction > 0) {
+            reductionDetails.push(`Defensive Guard: -${guardReduction} Dmg`);
+          }
+          if (absorbedByShield > 0) {
+            reductionDetails.push(`Arcane Barrier: -${absorbedByShield} Absorb (${manaShieldEff?.shieldHp || 0} HP left)`);
+          }
+
+          const isFullyAbsorbed = calculatedDmg > 0 && finalDmgTaken === 0;
+          if (isFullyAbsorbed) {
             sounds.playBlock();
           }
 
-          hero.currentHp = Math.max(0, hero.currentHp - dmg);
+          const reductionString = reductionDetails.length > 0
+            ? isFullyAbsorbed
+              ? `\n\n🛡️ FULL DAMAGE ABSORPTION: Rolled ${calculatedDmg} base damage, but [${reductionDetails.join(' + ')}] completely absorbed the blow (0 HP lost)!`
+              : `\n\n🛡️ DAMAGE REDUCTION APPLIED: Rolled ${calculatedDmg} Base Damage - [${reductionDetails.join(' + ')}] = ${finalDmgTaken} Final Damage Taken!`
+            : '';
 
-          setActionSummary({
-            title: atkRoll.isCrit ? 'CRITICAL ENEMY STRIKE! (Natural 20)' : `${monster.name} Struck You!`,
-            details: atkRoll.isCrit
-              ? `${action.name}: Rolled [20] + ${atkRoll.modifier} = ${atkRoll.total} (NATURAL 20 CRITICAL!). Penetrated all defenses!\n\n💥 CRITICAL DAMAGE: [${baseDmg} Base × 1.5 + 2 Brutality] = ${dmg} damage dealt to you!`
-              : `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. You took ${dmg} damage!`,
-            damage: dmg,
-            isHit: true,
-            isCrit: atkRoll.isCrit,
-            type: 'monster',
-          });
+          // Check Hero Counter-Attack if Defending
+          if (combat.heroDefending) {
+            const counterRes = parseAndRollFormula(guardProfile.counterFormula, heroStats, guardProfile.counterBonus);
+            const counterDmg = Math.max(1, counterRes.total);
+            monster.hp = Math.max(0, monster.hp - counterDmg);
+
+            if (guardProfile.sound === 'fire') sounds.playFire();
+            else sounds.playHit();
+
+            setActionSummary({
+              title: isFullyAbsorbed
+                ? `🛡️ BLOCKED & ${guardProfile.counterName.toUpperCase()}!`
+                : atkRoll.isCrit
+                ? 'CRITICAL ENEMY HIT & RETALIATION!'
+                : `${monster.name} Hit & ${guardProfile.counterName.toUpperCase()}!`,
+              details: `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your fortified AC ${heroAc}. Struck for ${calculatedDmg} base damage.${reductionString}\n\n⚔️ RETALIATORY COUNTER-ATTACK: Absorbing the blow, you counter-struck with ${guardProfile.counterName} (${counterRes.formulaString} = ${counterDmg} damage)!${monster.hp <= 0 ? `\n\n💀 ${monster.name.toUpperCase()} HAS BEEN SLAIN BY YOUR COUNTER-ATTACK!` : ''}`,
+              damage: finalDmgTaken,
+              isHit: true,
+              isCrit: atkRoll.isCrit,
+              type: 'monster',
+            });
+
+            addLog(
+              'hero',
+              `Counter-Attack: ${guardProfile.counterName}`,
+              `Retaliated against ${monster.name} for ${counterDmg} damage!`,
+              undefined,
+              counterDmg
+            );
+          } else {
+            setActionSummary({
+              title: isFullyAbsorbed
+                ? '🛡️ ATTACK FULLY ABSORBED / BLOCKED!'
+                : atkRoll.isCrit
+                ? 'CRITICAL ENEMY STRIKE! (Natural 20)'
+                : `${monster.name} Struck You!`,
+              details: atkRoll.isCrit
+                ? `${action.name}: Rolled [20] + ${atkRoll.modifier} = ${atkRoll.total} (NATURAL 20 CRITICAL!). Penetrated defenses!\n\n💥 CRITICAL DAMAGE: [${rawBaseDmg} Base × 1.5 + 2 Brutality] = ${calculatedDmg} damage.${reductionString}\n\nYou took ${finalDmgTaken} damage!`
+                : `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}.${reductionString}\nYou took ${finalDmgTaken} damage!`,
+              damage: finalDmgTaken,
+              isHit: true,
+              isCrit: atkRoll.isCrit,
+              type: 'monster',
+            });
+          }
+
+          const logDetail = isFullyAbsorbed
+            ? `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${heroAc}. HIT for ${calculatedDmg} base dmg, but 100% ABSORBED by ${reductionDetails.join(' + ')} (0 damage taken).`
+            : reductionDetails.length > 0
+            ? `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${heroAc}. HIT for ${calculatedDmg} base dmg [Reduced by ${reductionDetails.join(' + ')}] ➔ Took ${finalDmgTaken} damage.`
+            : `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${heroAc}. HIT for ${finalDmgTaken} damage.`;
 
           addLog(
             'monster',
-            atkRoll.isCrit ? `Critical Strike from ${monster.name}` : `${monster.name}: ${action.name}`,
-            atkRoll.isCrit
-              ? `NATURAL 20 CRITICAL! Struck with ${action.name} for ${dmg} critical damage!`
-              : `Attack roll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs your AC ${heroAc}. HIT for ${dmg} damage.`,
+            isFullyAbsorbed
+              ? `${monster.name} Attack Absorbed!`
+              : atkRoll.isCrit
+              ? `Critical Strike from ${monster.name}`
+              : `${monster.name}: ${action.name}`,
+            atkRoll.isCrit && !isFullyAbsorbed
+              ? `NATURAL 20 CRITICAL! Struck with ${action.name} for ${finalDmgTaken} damage (after protections).`
+              : logDetail,
             {
               diceType: 'd20',
               rolls: atkRoll.individualRolls,
@@ -844,16 +1172,42 @@ export const CombatView: React.FC<CombatViewProps> = ({
               targetValue: heroAc,
               isCrit: atkRoll.isCrit,
             },
-            dmg
+            finalDmgTaken
           );
         } else {
+          // Monster Missed!
           sounds.playBlock();
-          setActionSummary({
-            title: `${monster.name} Missed!`,
-            details: `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. The blow was deflected!`,
-            isHit: false,
-            type: 'monster',
-          });
+
+          if (combat.heroDefending) {
+            const counterRes = parseAndRollFormula(guardProfile.counterFormula, heroStats, guardProfile.counterBonus);
+            const counterDmg = Math.max(1, counterRes.total);
+            monster.hp = Math.max(0, monster.hp - counterDmg);
+
+            if (guardProfile.sound === 'fire') sounds.playFire();
+            else sounds.playHit();
+
+            setActionSummary({
+              title: `🛡️ DEFLECTED & ${guardProfile.counterName.toUpperCase()}!`,
+              details: `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your fortified AC ${heroAc}. Deflected cleanly by your guard stance!\n\n⚔️ RETALIATORY COUNTER-ATTACK: Seizing the opening, you struck with ${guardProfile.counterName} (${counterRes.formulaString} = ${counterDmg} damage)!${monster.hp <= 0 ? `\n\n💀 ${monster.name.toUpperCase()} HAS BEEN SLAIN BY YOUR COUNTER-ATTACK!` : ''}`,
+              isHit: false,
+              type: 'monster',
+            });
+
+            addLog(
+              'hero',
+              `Counter-Attack: ${guardProfile.counterName}`,
+              `Deflected attack and retaliated for ${counterDmg} damage!`,
+              undefined,
+              counterDmg
+            );
+          } else {
+            setActionSummary({
+              title: `${monster.name} Missed!`,
+              details: `${action.name}: Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. The blow was deflected!`,
+              isHit: false,
+              type: 'monster',
+            });
+          }
 
           addLog(
             'monster',
@@ -870,8 +1224,25 @@ export const CombatView: React.FC<CombatViewProps> = ({
         }
       }
 
+      // End of round state updates
       combat.heroDefending = false;
       combat.turnNumber += 1;
+
+      // Tick active buffs / status effects durations
+      if (hero.activeEffects && hero.activeEffects.length > 0) {
+        const remainingEffects: StatusEffect[] = [];
+        hero.activeEffects.forEach((eff) => {
+          const newTurns = eff.durationTurns - 1;
+          const isShieldDepleted = eff.shieldHp !== undefined && eff.shieldHp <= 0;
+          if (newTurns > 0 && !isShieldDepleted) {
+            remainingEffects.push({ ...eff, durationTurns: newTurns });
+          } else {
+            addLog('system', 'Buff Expired', `${eff.name} has dissipated.`);
+          }
+        });
+        hero.activeEffects = remainingEffects;
+      }
+
       onUpdateHero({ ...hero });
       onUpdateCombat({ ...combat });
       setCombatStep('ENEMY_RESULT');
@@ -1102,7 +1473,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
   };
 
   const handleFateDodgeMonster = () => {
-    if (hero.rerollTokens <= 0 || !actionSummary) return;
+    if (hero.rerollTokens <= 0 || !actionSummary || actionSummary.isCrit) return;
     if (actionSummary.damage) {
       hero.currentHp = Math.min(hero.maxHp, hero.currentHp + actionSummary.damage);
     }
@@ -1122,35 +1493,81 @@ export const CombatView: React.FC<CombatViewProps> = ({
       const isHit = atkRoll.isCrit || (!atkRoll.isFumble && atkRoll.total >= heroAc);
 
       if (isHit) {
-        const dmgRes = parseAndRollFormula(action.diceFormula);
+        const actionDice = action.damageDice || '1d6';
+        const dmgRes = parseAndRollFormula(actionDice);
         let dmg = dmgRes.total;
 
         if (atkRoll.isCrit) {
-          dmg = dmg * 2;
+          dmg = Math.floor(dmg * 1.5) + 2;
           sounds.playCriticalHit();
         } else {
           sounds.playHit();
         }
 
-        if (combat.heroDefending) {
-          dmg = Math.max(1, dmg - 3);
+        const activeBuffDmgReduction = (hero.activeEffects || []).reduce((sum, eff) => sum + (eff.damageReduction || 0), 0);
+        const guardReduction = combat.heroDefending ? (3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)) : 0;
+        const totalReduction = activeBuffDmgReduction + guardReduction;
+        let dmgAfterReduction = Math.max(0, dmg - totalReduction);
+
+        let absorbedByShield = 0;
+        const manaShieldEff = (hero.activeEffects || []).find((e) => e.id === 'mana_shield' && e.shieldHp && e.shieldHp > 0);
+        if (manaShieldEff && manaShieldEff.shieldHp) {
+          absorbedByShield = Math.min(manaShieldEff.shieldHp, dmgAfterReduction);
+          manaShieldEff.shieldHp -= absorbedByShield;
+          dmgAfterReduction = Math.max(0, dmgAfterReduction - absorbedByShield);
         }
 
-        hero.currentHp = Math.max(0, hero.currentHp - dmg);
+        const finalDmgTaken = dmgAfterReduction;
+        hero.currentHp = Math.max(0, hero.currentHp - finalDmgTaken);
+
+        const reductionDetails: string[] = [];
+        if (activeBuffDmgReduction > 0) {
+          const buffNames = (hero.activeEffects || []).filter((e) => (e.damageReduction || 0) > 0).map((e) => `${e.name} (-${e.damageReduction} Dmg)`).join(', ');
+          reductionDetails.push(buffNames);
+        }
+        if (guardReduction > 0) {
+          reductionDetails.push(`Defensive Guard: -${guardReduction} Dmg`);
+        }
+        if (absorbedByShield > 0) {
+          reductionDetails.push(`Arcane Barrier: -${absorbedByShield} Absorb (${manaShieldEff?.shieldHp || 0} HP left)`);
+        }
+
+        const isFullyAbsorbed = dmg > 0 && finalDmgTaken === 0;
+        if (isFullyAbsorbed) {
+          sounds.playBlock();
+        }
+
+        const reductionString = reductionDetails.length > 0
+          ? isFullyAbsorbed
+            ? `\n\n🛡️ FULL DAMAGE ABSORPTION: Rolled ${dmg} base damage, but [${reductionDetails.join(' + ')}] completely absorbed the blow (0 HP lost)!`
+            : `\n\n🛡️ DAMAGE REDUCTION APPLIED: Rolled ${dmg} Base - [${reductionDetails.join(' + ')}] = ${finalDmgTaken} Final Damage Taken!`
+          : '';
 
         setActionSummary({
-          title: atkRoll.isCrit ? `CRITICAL ${action.name.toUpperCase()}!` : `${action.name} Landed!`,
-          details: `${action.name} (Forced Reroll): Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}. Struck you for ${dmg} damage!`,
-          damage: dmg,
+          title: isFullyAbsorbed
+            ? '🛡️ ATTACK FULLY ABSORBED / BLOCKED!'
+            : atkRoll.isCrit
+            ? `CRITICAL ${action.name.toUpperCase()}!`
+            : `${action.name} Landed!`,
+          details: `${action.name} (Forced Reroll): Rolled [${atkRoll.individualRolls[0]}] ${atkRoll.modifier >= 0 ? `+ ${atkRoll.modifier}` : atkRoll.modifier} = ${atkRoll.total} vs your AC ${heroAc}.${reductionString}\nYou took ${finalDmgTaken} damage!`,
+          damage: finalDmgTaken,
           isHit: true,
           isCrit: atkRoll.isCrit,
           type: 'monster',
         });
 
+        const logDetail = isFullyAbsorbed
+          ? `Reroll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${heroAc}. HIT for ${dmg} base dmg, but 100% ABSORBED by ${reductionDetails.join(' + ')} (0 damage taken).`
+          : reductionDetails.length > 0
+          ? `Reroll: [${atkRoll.individualRolls[0]}]+${atkRoll.modifier}=${atkRoll.total} vs AC ${heroAc}. HIT for ${dmg} base dmg [Reduced by ${reductionDetails.join(' + ')}] ➔ Took ${finalDmgTaken} damage.`
+          : `Attack roll: ${atkRoll.total} vs your AC ${heroAc}. Dealt ${finalDmgTaken} damage.`;
+
         addLog(
           'monster',
-          `${monster.name} Hit (After Fate Dodge)`,
-          `Attack roll: ${atkRoll.total} vs your AC ${heroAc}. Dealt ${dmg} damage.`,
+          isFullyAbsorbed
+            ? `${monster.name} Attack Absorbed! (Fate Dodge)`
+            : `${monster.name} Hit (After Fate Dodge)`,
+          logDetail,
           {
             diceType: 'd20',
             rolls: atkRoll.individualRolls,
@@ -1159,7 +1576,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
             targetValue: heroAc,
             isCrit: atkRoll.isCrit,
           },
-          dmg
+          finalDmgTaken
         );
       } else {
         sounds.playBlock();
@@ -1299,15 +1716,27 @@ export const CombatView: React.FC<CombatViewProps> = ({
             {/* Active Spell Buffs / Modifiers Tracker in Hero HUD */}
             {hero.activeEffects && hero.activeEffects.length > 0 && (
               <div className="pt-1 flex flex-wrap gap-1">
-                {hero.activeEffects.map((eff) => (
-                  <span
-                    key={eff.id}
-                    className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-700 flex items-center gap-1"
-                  >
-                    <Sparkles className="w-2.5 h-2.5" />
-                    {eff.name} ({eff.durationTurns}t)
-                  </span>
-                ))}
+                {hero.activeEffects.map((eff) => {
+                  let bonusText = '';
+                  if (eff.damageReduction) bonusText = ` -${eff.damageReduction} Dmg`;
+                  else if (eff.armorModifier) bonusText = ` +${eff.armorModifier} AC`;
+                  else if (eff.attackModifier) bonusText = ` +${eff.attackModifier} Atk`;
+                  else if (eff.shieldHp) bonusText = ` ${eff.shieldHp} HP`;
+                  else if (eff.evasionBonus) bonusText = ` 75% Evade`;
+
+                  return (
+                    <span
+                      key={eff.id}
+                      title={eff.description}
+                      className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-950 text-blue-200 border border-blue-600 flex items-center gap-1 shadow-sm"
+                    >
+                      <Sparkles className="w-2.5 h-2.5 text-blue-400" />
+                      <span>{eff.name}</span>
+                      {bonusText && <span className="text-amber-300">({bonusText})</span>}
+                      <span className="text-stone-400">[{eff.durationTurns}t]</span>
+                    </span>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1433,7 +1862,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   </div>
                 </button>
 
-                {/* 2. Defend Guard */}
+                {/* 2. Defend Guard & Counter-Attack */}
                 <button
                   id="btn-combat-defend"
                   onClick={handleHeroDefend}
@@ -1445,15 +1874,20 @@ export const CombatView: React.FC<CombatViewProps> = ({
                     </div>
                     <div>
                       <div className="font-serif font-bold text-blue-200 text-sm">
-                        Defensive Guard & Shield
+                        {guardProfile.actionName}
                       </div>
                       <div className="text-[11px] text-blue-400/90 font-mono mt-0.5">
-                        Guaranteed +4 AC (AC {heroAc} ➔ {heroAc + 4})
+                        {guardProfile.actionSubtitle}
                       </div>
                     </div>
                   </div>
-                  <div className="w-full bg-[#0d121a] p-1.5 rounded border border-[#1d2b40] text-[10px] font-mono text-stone-300">
-                    <span className="text-blue-300 font-bold">Effect:</span> Absorbs {3 + (hero.equipment.shield?.armorBonus || 0)} damage (+3 Guard{hero.equipment.shield?.armorBonus ? ` +${hero.equipment.shield.armorBonus} Shield` : ''}) from monster attacks this turn.
+                  <div className="w-full bg-[#0d121a] p-1.5 rounded border border-[#1d2b40] text-[10px] font-mono text-stone-300 flex flex-col gap-0.5">
+                    <div>
+                      <span className="text-blue-300 font-bold">Defense:</span> Absorbs {3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)} dmg (+3 Base{hero.equipment.shield?.armorBonus ? ` +${hero.equipment.shield.armorBonus} Shield` : ''})
+                    </div>
+                    <div>
+                      <span className="text-amber-400 font-bold">⚔️ Retaliation:</span> Counter {guardProfile.counterName} ({guardProfile.counterFormula} + {guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} {guardProfile.counterStatKey})
+                    </div>
                   </div>
                 </button>
 
@@ -1990,39 +2424,51 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
               {/* Fate Dodge Opportunity when Monster lands a Hit on Hero */}
               {actionSummary.type === 'monster' && actionSummary.isHit && (
-                <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
-                      <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
-                      <span>Fate Dodge: Force Enemy Reroll</span>
+                actionSummary.isCrit ? (
+                  <div className="p-3 bg-red-950/60 border border-red-700/70 rounded-xl space-y-1 text-left">
+                    <div className="flex items-center gap-2 text-red-300 font-bold text-xs sm:text-sm">
+                      <Flame className="w-4 h-4 text-red-400 animate-pulse" />
+                      <span>Natural 20 Critical Strike — Fate Cannot Alter</span>
                     </div>
-                    <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
-                      {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
-                    </span>
+                    <p className="text-xs text-red-200/80 font-serif">
+                      A Natural 20 critical blow cleaves through time and destiny. Fate Dodge cannot be invoked against an enemy critical hit.
+                    </p>
                   </div>
+                ) : (
+                  <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-[#261536] to-purple-950/80 border-2 border-purple-500/80 rounded-xl shadow-lg space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-purple-200 font-bold text-xs sm:text-sm">
+                        <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+                        <span>Fate Dodge: Force Enemy Reroll</span>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-purple-200 bg-purple-900/90 px-2.5 py-0.5 rounded-full border border-purple-400/60 shadow">
+                        {hero.rerollTokens} {hero.rerollTokens === 1 ? 'Token' : 'Tokens'} Available
+                      </span>
+                    </div>
 
-                  <p className="text-xs text-purple-300/90 font-serif">
-                    Spend 1 Fate Reroll to rewind the strike, restore the damage taken, and force {monster.name} to re-roll their attack against your AC {heroAc}!
-                  </p>
+                    <p className="text-xs text-purple-300/90 font-serif">
+                      Spend 1 Fate Reroll to rewind the strike, restore the damage taken, and force {monster.name} to re-roll their attack against your AC {heroAc}!
+                    </p>
 
-                  <button
-                    id="btn-fate-dodge-monster"
-                    disabled={hero.rerollTokens <= 0}
-                    onClick={handleFateDodgeMonster}
-                    className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
-                      hero.rerollTokens > 0
-                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
-                        : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    <Shield className="w-4 h-4 text-purple-200" />
-                    <span>
-                      {hero.rerollTokens > 0
-                        ? `✦ Use Fate Reroll (${hero.rerollTokens} Available) - Fate Dodge`
-                        : 'No Fate Tokens in Inventory'}
-                    </span>
-                  </button>
-                </div>
+                    <button
+                      id="btn-fate-dodge-monster"
+                      disabled={hero.rerollTokens <= 0}
+                      onClick={handleFateDodgeMonster}
+                      className={`w-full py-2.5 px-4 rounded-xl font-serif font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                        hero.rerollTokens > 0
+                          ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] border border-purple-300/40'
+                          : 'bg-stone-900/80 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <Shield className="w-4 h-4 text-purple-200" />
+                      <span>
+                        {hero.rerollTokens > 0
+                          ? `✦ Use Fate Reroll (${hero.rerollTokens} Available) - Fate Dodge`
+                          : 'No Fate Tokens in Inventory'}
+                      </span>
+                    </button>
+                  </div>
+                )
               )}
 
               {/* Progress Controls */}
@@ -2032,6 +2478,15 @@ export const CombatView: React.FC<CombatViewProps> = ({
                     <Skull className="w-5 h-5 animate-bounce" />
                     Hero has fallen...
                   </div>
+                ) : monster.hp <= 0 ? (
+                  <button
+                    id="btn-claim-counter-victory"
+                    onClick={handleMonsterSlain}
+                    className="px-6 py-3 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 text-stone-950 font-black font-serif rounded-xl shadow-xl flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105 animate-pulse"
+                  >
+                    <Trophy className="w-5 h-5" />
+                    <span>Claim Victory & Spoils ➔</span>
+                  </button>
                 ) : combat.heroStumbled ? (
                   <button
                     id="btn-forfeit-stumble-turn"

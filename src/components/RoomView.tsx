@@ -31,6 +31,7 @@ import { LootRollerModal } from './LootRollerModal';
 import { ActionChallengeModal, ActionChallengeConfig } from './ActionChallengeModal';
 import { rollDice, getStatModifier, RollResult } from '../utils/dice';
 import { sounds } from '../utils/audio';
+import { addItemToHero, removeItemFromHero, syncHeroSupplies } from '../utils/inventory';
 
 interface RoomViewProps {
   floor: DungeonFloor;
@@ -105,21 +106,19 @@ export const RoomView: React.FC<RoomViewProps> = ({
     const hasPicks = hero.lockpicks > 0;
     if (hasPicks) {
       bonus += 3;
-      hero.lockpicks -= 1;
-      onUpdateHero({ ...hero });
     }
 
     setChallengeConfig({
       type: 'CHEST_PICK',
       title: 'Pick Lock on Iron Chest Vault',
       subtitle:
-        'You insert fine lockpicks into the heavy iron tumbler, carefully testing each pin against the tension wrench.',
+        'You insert your reusable masterwork lockpicks into the heavy iron tumbler, carefully testing each pin against the tension wrench.',
       iconType: 'chest',
       stat: 'DEX',
       dc: room.chest.lockDifficulty,
       bonus,
       bonusBreakdown: hasPicks
-        ? `DEX Mod (${getStatModifier(heroStats.DEX)}) + Lockpick Tool (+3)`
+        ? `DEX Mod (${getStatModifier(heroStats.DEX)}) + Reusable Lockpick Kit (+3)`
         : `DEX Mod (${getStatModifier(heroStats.DEX)})`,
       successOutcomeTitle: 'Tumbler Unlocked!',
       successOutcomeDesc: `With a satisfying mechanical click, the iron chest springs open! Ready to collect your spoils.`,
@@ -217,8 +216,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
     hero.statsHistory.goldCollected += goldEarned;
 
     itemsEarned.forEach((item) => {
-      hero.inventory.push({ item, quantity: 1 });
+      addItemToHero(hero, item, 1);
     });
+    syncHeroSupplies(hero);
 
     setShowLootModal(false);
     setEventMessage(
