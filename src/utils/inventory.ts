@@ -152,15 +152,17 @@ export function removeItemFromHero(
 }
 
 /**
- * Consumes 1 ration from the backpack to restore HP
+ * Consumes 1 ration from the backpack to restore HP & Energy
  */
-export function consumeHeroRation(hero: HeroCharacter): { success: boolean; hpHealed: number } {
+export function consumeHeroRation(hero: HeroCharacter): { success: boolean; hpHealed: number; energyHealed: number } {
   const hasRation = removeItemFromHero(hero, 'dungeon_ration', 1);
-  if (!hasRation) return { success: false, hpHealed: 0 };
+  if (!hasRation) return { success: false, hpHealed: 0, energyHealed: 0 };
 
   const hpHealed = 8;
+  const energyHealed = 6;
   hero.currentHp = Math.min(hero.maxHp, hero.currentHp + hpHealed);
-  return { success: true, hpHealed };
+  hero.currentMana = Math.min(hero.maxMana, hero.currentMana + energyHealed);
+  return { success: true, hpHealed, energyHealed };
 }
 
 /**

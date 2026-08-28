@@ -24,6 +24,7 @@ import {
   Crown,
   Eye,
   Hammer,
+  Zap,
 } from 'lucide-react';
 import { DungeonFloor, DungeonRoom, GameItem, HeroCharacter, StatType } from '../types/game';
 import { DiceVisualizer } from './DiceVisualizer';
@@ -80,6 +81,29 @@ export const RoomView: React.FC<RoomViewProps> = ({
   // Action Challenge Modal State for focused full-screen action resolution
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [challengeConfig, setChallengeConfig] = useState<ActionChallengeConfig | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top of modal container whenever room events, traps, chests, or rolls occur
+  useEffect(() => {
+    if (containerRef.current) {
+      const scrollParent = containerRef.current.closest('.overflow-y-auto');
+      if (scrollParent) {
+        scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [
+    eventMessage,
+    room.trap?.disarmed,
+    room.trap?.triggered,
+    room.chest?.isOpened,
+    room.chest?.isJammed,
+    room.chest?.isFailed,
+    room.shrineUsed,
+    room.secretFound,
+    room.isLooted,
+    currentRoll,
+  ]);
 
   // Check inventory for wall tools
   const hasBreachingTool = hero.inventory.find(
@@ -232,11 +256,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const handleDisarmTrap = (stat: StatType = 'DEX') => {
     if (!room.trap || room.trap.disarmed) return;
 
-    let bonus = getStatModifier(heroStats[stat]);
-    const hasPicksBonus = stat === 'DEX' && hero.lockpicks > 0;
-    if (hasPicksBonus) {
-      bonus += 2;
-    }
+    const bonus = getStatModifier(heroStats[stat]);
 
     const statName =
       stat === 'DEX'
@@ -255,9 +275,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       stat,
       dc: room.trap.difficulty,
       bonus,
-      bonusBreakdown: hasPicksBonus
-        ? `${statName} Mod (${getStatModifier(heroStats[stat])}) + Lockpick Bonus (+2)`
-        : `${statName} Mod (${bonus})`,
+      bonusBreakdown: `${statName} Mod (${bonus >= 0 ? `+${bonus}` : bonus})`,
       successOutcomeTitle: 'Trap Neutralized!',
       successOutcomeDesc: `You carefully dismantle the trigger mechanism and sever the tripwires. Gained +20 XP!`,
       failureOutcomeTitle: 'Trap Sprung!',
@@ -347,7 +365,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   };
 
   return (
-    <div id="room-view-container" className="max-w-4xl mx-auto space-y-4">
+    <div ref={containerRef} id="room-view-container" className="max-w-4xl mx-auto space-y-4">
       {/* Room Narrative & Atmosphere Card */}
       <div className="bg-[#241a12] border-2 border-[#735438] rounded-xl p-4 md:p-5 shadow-2xl relative overflow-hidden">
         <div className="flex items-center justify-between border-b border-[#4d3723] pb-2.5 mb-3">
@@ -539,7 +557,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {/* Dexterity / Lockpick Disarm */}
+                    {/* Dexterity Disarm */}
                     <button
                       id="btn-trap-dex"
                       disabled={isRolling}
@@ -547,12 +565,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
                       className="p-2 bg-[#332213] hover:bg-[#48301c] text-amber-200 border border-[#7a5836] rounded text-xs font-serif font-bold flex items-center justify-between cursor-pointer transition-colors disabled:opacity-50"
                     >
                       <div className="flex items-center gap-1.5">
-                        <Key className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                         <span className="text-left">Dexterity Disarm</span>
                       </div>
                       <span className="font-mono text-[10px] text-cyan-300">
-                        {getStatModifier(heroStats.DEX) + (hero.lockpicks > 0 ? 2 : 0) >= 0
-                          ? `+${getStatModifier(heroStats.DEX) + (hero.lockpicks > 0 ? 2 : 0)}`
+                        {getStatModifier(heroStats.DEX) >= 0
+                          ? `+${getStatModifier(heroStats.DEX)}`
                           : getStatModifier(heroStats.DEX)}
                       </span>
                     </button>

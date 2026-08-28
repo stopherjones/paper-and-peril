@@ -170,19 +170,19 @@ export const LootRollerModal: React.FC<LootRollerModalProps> = ({
             </div>
 
             {/* Table Reference Preview */}
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-56 overflow-y-auto pr-1 border border-stone-800/80 rounded-lg p-1.5 bg-stone-950/40">
               {LOOT_TABLE_CHEST.rows.map((row) => (
                 <div
                   key={row.id}
-                  className="p-2 rounded bg-stone-950/60 border border-stone-800 text-xs flex items-center justify-between text-stone-400"
+                  className="p-2 rounded bg-stone-950/70 hover:bg-stone-900 border border-stone-800/80 text-xs flex items-center justify-between text-stone-400 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-amber-400/90 font-bold px-1.5 py-0.5 bg-stone-900 rounded">
-                      [{row.minRoll}-{row.maxRoll}]
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-amber-400 font-bold px-1.5 py-0.5 bg-stone-900 border border-amber-900/50 rounded shrink-0">
+                      {row.minRoll === row.maxRoll ? `d20: ${row.minRoll}` : `[${row.minRoll}-${row.maxRoll}]`}
                     </span>
-                    <span className="text-stone-300 font-semibold">{row.name}</span>
+                    <span className="text-stone-200 font-semibold truncate">{row.name}</span>
                   </div>
-                  <span className="text-[11px] text-stone-400">{row.subtitle}</span>
+                  <span className="text-[11px] text-amber-400/80 shrink-0 ml-2 font-mono">{row.badge}</span>
                 </div>
               ))}
             </div>
@@ -191,18 +191,25 @@ export const LootRollerModal: React.FC<LootRollerModalProps> = ({
           /* Result Award Screen */
           <div className="space-y-4 animate-fadeIn">
             <div className="p-4 rounded-xl bg-gradient-to-r from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 shadow-xl">
-              <div className="flex items-center justify-between mb-3 border-b border-amber-900/60 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-amber-500 text-stone-950 font-bold font-mono text-xs">
-                    Rolled {currentRoll}
-                  </span>
-                  <span className="font-serif font-bold text-amber-200">
-                    {selectedRow?.name}
-                  </span>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3 border-b border-amber-900/60 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0">
+                    <DieShape sides={20} value={currentRoll || 1} size="md" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-amber-500 text-stone-950 font-bold font-mono text-xs">
+                        d20 Result: {currentRoll}
+                      </span>
+                      <span className="text-xs font-mono text-emerald-400 font-bold">
+                        {selectedRow?.badge}
+                      </span>
+                    </div>
+                    <h3 className="font-serif font-black text-base sm:text-lg text-amber-200 mt-0.5">
+                      {selectedRow?.name}
+                    </h3>
+                  </div>
                 </div>
-                <span className="text-xs font-mono text-emerald-400 font-bold">
-                  {selectedRow?.badge}
-                </span>
               </div>
 
               {/* Loot contents */}
@@ -221,16 +228,32 @@ export const LootRollerModal: React.FC<LootRollerModalProps> = ({
                 </div>
 
                 {/* Items Card */}
-                <div className="p-3 bg-stone-950/80 rounded-lg border border-amber-800/60 flex items-center gap-3">
-                  <div className="p-2 bg-purple-500/20 rounded-full text-purple-400">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs text-stone-400">Items Discovered</div>
-                    <div className="text-sm font-bold text-purple-200 truncate">
-                      {awardedItems.map((i) => i.name).join(', ') || 'Valuable Trinkets'}
+                <div className="p-3 bg-stone-950/80 rounded-lg border border-purple-800/60 flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="p-1.5 bg-purple-500/20 rounded-full text-purple-400">
+                      <Sparkles className="w-4 h-4" />
                     </div>
+                    <div className="text-xs text-stone-400">Gear & Relics Discovered</div>
                   </div>
+                  {awardedItems.length > 0 ? (
+                    <div className="space-y-1 mt-1">
+                      {awardedItems.map((item, idx) => (
+                        <div key={idx} className="flex flex-col">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-amber-200">{item.name}</span>
+                            <span className="text-[10px] font-mono text-purple-300 font-bold uppercase px-1.5 py-0.2 bg-purple-950/80 border border-purple-800/60 rounded">
+                              {item.rarity}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-stone-300 line-clamp-2 mt-0.5 font-serif">
+                            {item.description}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-stone-400 italic">None</div>
+                  )}
                 </div>
               </div>
             </div>

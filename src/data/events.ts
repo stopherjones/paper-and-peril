@@ -145,7 +145,7 @@ export const TRAPS_DATABASE: TrapDefinition[] = [
     statCheck: 'DEX',
     difficulty: 12,
     damageFormula: '1d8+2',
-    disarmHint: 'Use lockpicks or wedge an iron dagger into the trip mechanism (DEX check vs DC 12).',
+    disarmHint: 'Carefully bypass or wedge a dagger into the trip mechanism (DEX check vs DC 12).',
     failFlavor: 'Click! A volley of green-tipped iron darts pecks through your armor!',
     successFlavor: 'With steady hands, you jam the spring plate and collect 2 intact darts.',
   },

@@ -280,7 +280,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                   if (idx !== -1) handleUseItem(idx);
                 }}
                 className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#24160d] hover:bg-[#382315] border border-[#4d2f1b] transition-colors cursor-pointer text-amber-200"
-                title="Eat 1 Ration from pack (+8 HP)"
+                title="Eat 1 Ration from pack (+8 HP & +6 Energy)"
               >
                 <Utensils className="w-3.5 h-3.5 text-amber-500" />
                 <span>Eat Ration ({hero.rations})</span>
@@ -566,7 +566,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         className="w-full py-2 bg-gradient-to-b from-[#2d5930] to-[#1d3d20] hover:from-[#386e3c] hover:to-[#244c27] text-emerald-100 font-serif font-bold text-xs rounded-lg border border-emerald-500 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
                       >
                         <Utensils className="w-4 h-4 text-amber-400" />
-                        <span>Eat Salted Ration (+8 HP) [Single-use]</span>
+                        <span>Eat Salted Ration (+8 HP / +6 Energy) [Single-use]</span>
                       </button>
                     )}
 

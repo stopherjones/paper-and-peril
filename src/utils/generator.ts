@@ -151,12 +151,15 @@ export function generateLootForFloor(floorNumber: number, isMajorChest: boolean 
   const items: GameItem[] = [];
 
   const commonPool = ['minor_healing_potion', 'dungeon_ration', 'dungeon_torch', 'iron_lockpick', 'mana_draught'];
-  const uncommonPool = ['iron_shortsword', 'steel_broadsword', 'wooden_buckler', 'iron_kite_shield', 'leather_tunic', 'hunting_bow', 'scroll_of_fireball', 'scroll_of_teleport', 'potion_of_phasing'];
+  const uncommonPool = ['greater_mana_draught', 'iron_shortsword', 'steel_broadsword', 'wall_axe', 'wooden_buckler', 'iron_kite_shield', 'leather_tunic', 'hunting_bow', 'scroll_of_fireball', 'scroll_of_teleport', 'potion_of_phasing', 'brass_spyglass'];
   const rarePool = ['plate_armor_of_the_champion', 'crown_of_clarity', 'boots_of_haste', 'ring_of_vitality', 'ring_of_fortune', 'amulet_of_power', 'shadow_stiletto', 'gem_ruby', 'dice_of_fate', 'elixir_of_heroism', 'dwarven_sledgehammer'];
   const epicPool = ['dragonslayer_greatsword', 'aegis_of_light', 'amulet_of_the_archon', 'gem_diamond', 'archmage_scepter', 'dragonscale_armor'];
 
-  // Always drop 1 potion/supply
-  const potId = commonPool[Math.floor(Math.random() * commonPool.length)];
+  // Always drop 1 potion/supply (higher floors have chance of greater potions)
+  let potId = commonPool[Math.floor(Math.random() * commonPool.length)];
+  if (floorNumber >= 2 && Math.random() < 0.4) {
+    potId = Math.random() < 0.5 ? 'greater_healing_potion' : 'greater_mana_draught';
+  }
   if (ITEMS_DATABASE[potId]) items.push(ITEMS_DATABASE[potId]);
 
   // Roll for equipment/relic
@@ -188,12 +191,12 @@ export function generateMerchantStock(floorNumber: number): GameItem[] {
     'minor_healing_potion',
     'greater_healing_potion',
     'mana_draught',
+    'greater_mana_draught',
     'dungeon_ration',
     'iron_lockpick',
     'dungeon_torch',
     'miner_pickaxe',
     'scroll_of_clairvoyance',
-    'dice_of_fate',
   ];
 
   if (floorNumber === 1) {

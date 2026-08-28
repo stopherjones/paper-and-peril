@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Skull,
   Shield,
@@ -93,6 +93,27 @@ export const CombatView: React.FC<CombatViewProps> = ({
     isFumble?: boolean;
     type: 'hero' | 'monster' | 'flee';
   } | null>(null);
+
+  const actionZoneRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Ensure viewport / container focus returns to the top on every combat step, roll result, and turn transition
+    if (actionZoneRef.current) {
+      const scrollParent = actionZoneRef.current.closest('.overflow-y-auto');
+      if (scrollParent) {
+        scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [
+    combatStep,
+    combat.turnNumber,
+    combat.isHeroTurn,
+    combat.monster.hp,
+    hero.currentHp,
+    actionSummary,
+    activeSpellChoice,
+    activeItemChoice,
+  ]);
 
   const monster = combat.monster;
   const monsterHpPercent = Math.max(0, Math.min(100, (monster.hp / monster.maxHp) * 100));
@@ -1655,164 +1676,8 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-4 font-sans text-amber-100 animate-fadeIn">
-      {/* Top Banner: Dual Combatant HUD (Hero vs Monster) */}
-      <div className="bg-[#18120c]/95 border-2 border-red-900/80 rounded-2xl p-4 sm:p-5 shadow-2xl backdrop-blur-md relative overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-          {/* Left: Hero Combatant Card */}
-          <div className="md:col-span-5 bg-stone-950/70 border border-amber-900/60 rounded-xl p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/80 flex items-center justify-center text-amber-300 font-bold">
-                  <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-serif font-black text-amber-100 text-sm sm:text-base leading-tight">
-                    {hero.name}
-                  </h3>
-                  <span className="text-[11px] font-mono text-amber-400/80">
-                    Lvl {hero.level} {hero.classId}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 font-mono text-xs">
-                <span className="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-700 text-blue-300 font-bold">
-                  AC {heroAc}
-                </span>
-                {combat.heroDefending && (
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-600 text-emerald-300 text-[10px] font-bold animate-pulse">
-                    SHIELD +4
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Hero HP & Mana */}
-            <div className="space-y-1.5">
-              <div>
-                <div className="flex justify-between text-[11px] font-mono">
-                  <span className="text-emerald-400 font-bold">Hero HP</span>
-                  <span className="text-stone-300">
-                    {hero.currentHp} / {hero.maxHp}
-                  </span>
-                </div>
-                <div className="w-full bg-stone-900 rounded-full h-2.5 border border-stone-800 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full transition-all duration-500 rounded-full"
-                    style={{ width: `${heroHpPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-[11px] font-mono">
-                  <span className="text-cyan-400 font-bold">Energy</span>
-                  <span className="text-stone-300">
-                    {hero.currentMana} / {hero.maxMana} EP
-                  </span>
-                </div>
-                <div className="w-full bg-stone-900 rounded-full h-2 border border-stone-800 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full transition-all duration-500 rounded-full"
-                    style={{ width: `${(hero.currentMana / hero.maxMana) * 100}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Active Spell Buffs / Modifiers Tracker in Hero HUD */}
-            {hero.activeEffects && hero.activeEffects.length > 0 && (
-              <div className="pt-1 flex flex-wrap gap-1">
-                {hero.activeEffects.map((eff) => {
-                  let bonusText = '';
-                  if (eff.damageReduction) bonusText = ` -${eff.damageReduction} Dmg`;
-                  else if (eff.armorModifier) bonusText = ` +${eff.armorModifier} AC`;
-                  else if (eff.attackModifier) bonusText = ` +${eff.attackModifier} Atk`;
-                  else if (eff.shieldHp) bonusText = ` ${eff.shieldHp} HP`;
-                  else if (eff.evasionBonus) bonusText = ` 75% Evade`;
-
-                  return (
-                    <span
-                      key={eff.id}
-                      title={eff.description}
-                      className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-950 text-blue-200 border border-blue-600 flex items-center gap-1 shadow-sm"
-                    >
-                      <Sparkles className="w-2.5 h-2.5 text-blue-400" />
-                      <span>{eff.name}</span>
-                      {bonusText && <span className="text-amber-300">({bonusText})</span>}
-                      <span className="text-stone-400">[{eff.durationTurns}t]</span>
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Center: VS & Round Badge */}
-          <div className="md:col-span-2 flex flex-col items-center justify-center py-1">
-            <span className="px-3 py-1 rounded-full bg-red-950 border-2 border-red-700 text-red-300 font-black font-mono text-xs shadow-lg uppercase tracking-wider">
-              VS
-            </span>
-            <span className="text-[10px] font-mono text-stone-400 mt-1 font-bold">
-              Round {combat.turnNumber}
-            </span>
-          </div>
-
-          {/* Right: Monster Combatant Card */}
-          <div className="md:col-span-5 bg-stone-950/70 border border-red-900/60 rounded-xl p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-lg bg-red-950/80 border border-red-600 flex items-center justify-center text-red-400 font-bold">
-                  <Skull className="w-5 h-5 animate-pulse" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-serif font-black text-red-200 text-sm sm:text-base leading-tight">
-                      {monster.name}
-                    </h3>
-                    {monster.isBoss && (
-                      <span className="px-1.5 py-0.2 rounded bg-amber-950 border border-amber-600 text-amber-300 text-[9px] font-mono font-bold">
-                        BOSS
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-mono text-red-400/80">
-                    Level {monster.level} Threat
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 font-mono text-xs">
-                <span className="px-2 py-0.5 rounded bg-stone-900 border border-stone-700 text-amber-300 font-bold">
-                  AC {monster.armorClass}
-                </span>
-                <span className="px-2 py-0.5 rounded bg-red-950 border border-red-800 text-red-300 font-bold">
-                  +{monster.attackBonus}
-                </span>
-              </div>
-            </div>
-
-            {/* Monster HP */}
-            <div className="space-y-1.5 pt-1">
-              <div>
-                <div className="flex justify-between text-[11px] font-mono">
-                  <span className="text-red-400 font-bold">Monster Vitality</span>
-                  <span className="text-stone-300">
-                    {monster.hp} / {monster.maxHp} HP
-                  </span>
-                </div>
-                <div className="w-full bg-stone-900 rounded-full h-2.5 border border-stone-800 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-red-700 via-red-600 to-amber-600 h-full transition-all duration-500 rounded-full"
-                    style={{ width: `${monsterHpPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Middle Interactive Zone: Combat Actions, Rolls & Outcome Steps */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Interactive Zone: Combat Actions, Rolls & Outcome Steps */}
+      <div ref={actionZoneRef} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left 2 Cols: Main Combat Interaction & Step Card */}
         <div className="lg:col-span-2 space-y-4">
           {/* STEP 1: Hero Action Choice (With Detailed Explanatory Formulas) */}
@@ -2081,6 +1946,16 @@ export const CombatView: React.FC<CombatViewProps> = ({
                 </div>
               </div>
 
+              {/* Visual Attack Dice Visualizer */}
+              <div className="py-1">
+                <DiceVisualizer
+                  currentRoll={pendingAttack.atkRoll}
+                  isRolling={false}
+                  allowCustomDice={false}
+                  label={`Attack Roll (1d20 + ${pendingAttack.atkRoll.modifier}) vs AC ${monster.armorClass}`}
+                />
+              </div>
+
               {/* Visual Attack Dice Breakdown */}
               <div className="p-4 bg-stone-900/80 rounded-lg border border-amber-900/60 space-y-2">
                 <div className="text-sm text-stone-200 leading-relaxed font-serif whitespace-pre-line">
@@ -2247,6 +2122,18 @@ export const CombatView: React.FC<CombatViewProps> = ({
                 )}
               </div>
 
+              {/* Visual Damage Dice Visualizer */}
+              {damageRoll && (
+                <div className="py-1">
+                  <DiceVisualizer
+                    currentRoll={damageRoll}
+                    isRolling={false}
+                    allowCustomDice={false}
+                    label={`Damage Roll: ${pendingAttack?.damageFormula || ''} (${actionSummary.damage} Damage Dealt)`}
+                  />
+                </div>
+              )}
+
               <div className="p-4 bg-stone-900/80 rounded-lg border border-amber-900/60 text-sm text-stone-200 leading-relaxed font-serif space-y-2">
                 <div className="whitespace-pre-line">{actionSummary.details}</div>
 
@@ -2331,6 +2218,18 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   </h3>
                 </div>
               </div>
+
+              {/* Visual Action Dice Visualizer */}
+              {currentRoll && (
+                <div className="py-1">
+                  <DiceVisualizer
+                    currentRoll={currentRoll}
+                    isRolling={false}
+                    allowCustomDice={false}
+                    label={actionSummary.title}
+                  />
+                </div>
+              )}
 
               <div className="p-4 bg-stone-900/80 rounded-lg border border-amber-900/60 text-sm text-stone-200 leading-relaxed font-serif">
                 {actionSummary.details}
@@ -2436,6 +2335,18 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   </span>
                 )}
               </div>
+
+              {/* Visual Enemy Strike Dice Result */}
+              {currentRoll && (
+                <div className="py-1">
+                  <DiceVisualizer
+                    currentRoll={currentRoll}
+                    isRolling={false}
+                    allowCustomDice={false}
+                    label={`${monster.name} Attack Roll vs Hero AC ${heroAc}`}
+                  />
+                </div>
+              )}
 
               <div className="p-4 bg-stone-900/80 rounded-lg border border-red-900/60 text-sm text-stone-200 leading-relaxed font-serif space-y-2">
                 <div className="whitespace-pre-line">{actionSummary.details}</div>
@@ -2565,6 +2476,18 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   {actionSummary.title}
                 </h3>
               </div>
+
+              {/* Visual Flee Dice Result */}
+              {currentRoll && (
+                <div className="py-1">
+                  <DiceVisualizer
+                    currentRoll={currentRoll}
+                    isRolling={false}
+                    allowCustomDice={false}
+                    label="Tactical Escape Check (1d20 + DEX)"
+                  />
+                </div>
+              )}
 
               <div className="p-4 bg-stone-900/80 rounded-lg border border-emerald-900/60 text-sm text-stone-200 leading-relaxed font-serif">
                 {actionSummary.details}

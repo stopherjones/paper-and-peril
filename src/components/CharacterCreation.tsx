@@ -94,12 +94,13 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
 
   // Character Name & Fate Tokens
   const [characterName, setCharacterName] = useState('Alden Ironbreaker');
-  const [fateTokens, setFateTokens] = useState(2);
+  const [fateTokens, setFateTokens] = useState(1);
 
   // Helper to choose class
   const handleSelectClass = (classId: HeroClassId) => {
     setSelectedClassId(classId);
     sounds.playBlock();
+    setFateTokens(classId === 'rogue' ? 2 : 1);
 
     const newClass = HERO_CLASSES.find((c) => c.id === classId) || HERO_CLASSES[0];
     setStats({ ...newClass.baseStats });
@@ -256,7 +257,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
     // Apply Boon
     let startingGold = selectedClass.startingGold;
     let extraRations = 3;
-    let extraTorches = 2;
+    let extraTorches = selectedClassId === 'rogue' ? 0 : 2;
     let extraRerollTokens = selectedClassId === 'rogue' ? 2 : 1;
 
     const activeBoon = rolledBoon || STARTING_BOON_TABLE.rows[0].data;
@@ -551,6 +552,12 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                         <span>Starting Gold:</span>
                         <span className="text-yellow-400 font-bold">
                           {heroClass.startingGold} Gold
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-stone-400">
+                        <span>Starting Fate:</span>
+                        <span className="text-purple-300 font-bold">
+                          {heroClass.id === 'rogue' ? '2 Fate Tokens' : '1 Fate Token'}
                         </span>
                       </div>
                     </div>
@@ -1015,7 +1022,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                 <div className="pt-1">
                   <div className="text-[11px] font-mono text-stone-400 uppercase">STARTING WEALTH & SUPPLIES</div>
                   <div className="text-xs font-mono text-yellow-300 font-bold mt-0.5">
-                    {selectedClass.startingGold + (rolledBoon?.type === 'gold' ? rolledBoon.value : 0)} Gold • 3 Rations • 2 Torches
+                    {selectedClass.startingGold + (rolledBoon?.type === 'gold' ? rolledBoon.value : 0)} Gold • 3 Rations • {selectedClass.id === 'rogue' ? (rolledBoon?.type === 'supplies' ? '2 Torches (Boon)' : '0 Torches (Uses Spyglass)') : (rolledBoon?.type === 'supplies' ? '4 Torches' : '2 Torches')}
                   </div>
                 </div>
               </div>

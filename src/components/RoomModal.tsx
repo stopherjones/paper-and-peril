@@ -103,12 +103,30 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     }
   };
 
+  // Scroll back to the top of the container after any interaction, turn transition, room state change, or damage
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = 0;
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
     setIsScrolled(false);
-  }, [combat?.monster?.id, room.id]);
+  }, [
+    combat?.monster?.id,
+    combat?.turnNumber,
+    combat?.isHeroTurn,
+    combat?.heroDefending,
+    combat?.monster?.hp,
+    room.id,
+    room.trap?.disarmed,
+    room.trap?.triggered,
+    room.chest?.isOpened,
+    room.chest?.isJammed,
+    room.chest?.isFailed,
+    room.shrineUsed,
+    room.secretFound,
+    room.isLooted,
+    hero.currentHp,
+    hero.currentMana,
+  ]);
 
   if (!isOpen) return null;
 
@@ -175,170 +193,181 @@ export const RoomModal: React.FC<RoomModalProps> = ({
         {/* Sticky Top Header Bar */}
         <div className="bg-[#150e08] border-b-2 border-[#523821] p-3 sm:p-4 shrink-0 shadow-md transition-all duration-200">
           {combat ? (
-            /* COMBAT HEADER: Clean on top load, condensed VS HUD when scrolled */
-            isScrolled ? (
-              /* Condensed Sticky VS HUD during Combat scroll */
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 animate-fadeIn">
-                {/* Hero Side */}
-                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-start">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="font-mono text-[10px] bg-[#24150b] text-amber-400 px-1.5 py-0.5 rounded border border-[#523319] font-bold shrink-0">
-                      [{room.gridX + 1},{room.gridY + 1}]
-                    </span>
-                    <span className="font-serif font-black text-amber-100 text-xs sm:text-sm truncate max-w-[110px] sm:max-w-[150px]">
-                      {hero.name}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 font-mono text-xs">
-                    {/* Hero HP */}
-                    <div
-                      className="flex items-center gap-1 bg-[#20140c] px-2 py-0.5 rounded border border-stone-800"
-                      title={`Hero HP: ${hero.currentHp}/${hero.maxHp}`}
-                    >
-                      <Heart className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20 shrink-0" />
-                      <span className="font-bold text-emerald-300">
-                        {hero.currentHp}/{hero.maxHp}
+            /* COMBAT HEADER: Always visible expanded duel HUD with names, stats & matching mini bars */
+            <div className="flex flex-col gap-2 animate-fadeIn">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                {/* Left: Hero Combatant HUD (Col 1-5 on md+) */}
+                <div className="md:col-span-5 bg-[#1a110a] border border-amber-900/60 rounded-xl p-2.5 flex flex-col gap-2 shadow-sm">
+                  {/* Hero Identity & AC */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-mono text-[10px] bg-[#29170c] text-amber-400 px-1.5 py-0.5 rounded border border-[#523015] font-bold shrink-0">
+                        [{room.gridX + 1},{room.gridY + 1}]
                       </span>
-                      <div className="w-8 h-1.5 bg-stone-900 rounded-full overflow-hidden border border-stone-800 hidden md:block">
-                        <div
-                          className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400"
-                          style={{ width: `${hpPercent}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Hero Mana */}
-                    <div
-                      className="flex items-center gap-1 bg-[#20140c] px-2 py-0.5 rounded border border-stone-800"
-                      title={`Hero Mana: ${hero.currentMana}/${hero.maxMana}`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span className="font-bold text-cyan-300">
-                        {hero.currentMana}/{hero.maxMana}
+                      <h3 className="font-serif font-black text-amber-100 text-xs sm:text-sm truncate">
+                        {hero.name}
+                      </h3>
+                      <span className="text-[10px] font-mono text-amber-400/80 shrink-0 capitalize">
+                        Lvl {hero.level} {hero.classId}
                       </span>
                     </div>
 
-                    {/* Hero AC */}
+                    {/* Hero AC Badge */}
                     <div
-                      className="flex items-center gap-1 bg-[#20140c] px-2 py-0.5 rounded border border-stone-800"
+                      className="flex items-center gap-1 bg-[#100a06] px-2 py-0.5 rounded border border-blue-900/70 text-xs font-mono shrink-0"
                       title={`Hero Armor Class: ${heroAc}`}
                     >
                       <Shield className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                       <span className="font-bold text-blue-200">AC {heroAc}</span>
                       {combat.heroDefending && (
-                        <span className="text-[9px] text-emerald-300 bg-emerald-950 border border-emerald-600 px-1 rounded font-bold">
+                        <span className="text-[9px] text-emerald-300 bg-emerald-950 border border-emerald-600 px-1 rounded font-bold animate-pulse">
                           +4
                         </span>
                       )}
                     </div>
                   </div>
-                </div>
 
-                {/* Center VS Indicator */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="px-2.5 py-0.5 rounded-full bg-red-950 border border-red-700 text-red-300 font-mono font-black text-xs shadow-md">
-                    VS
-                  </span>
-                  <span className="text-[10px] font-mono text-stone-400 font-bold hidden sm:inline">
-                    Rnd {combat.turnNumber}
-                  </span>
-                </div>
-
-                {/* Enemy Side */}
-                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
-                  <div className="flex items-center gap-1.5 font-mono text-xs">
-                    {/* Enemy HP */}
-                    <div
-                      className="flex items-center gap-1 bg-[#20140c] px-2 py-0.5 rounded border border-stone-800"
-                      title={`${combat.monster.name} HP: ${combat.monster.hp}/${combat.monster.maxHp}`}
-                    >
-                      <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500/20 shrink-0" />
-                      <span className="font-bold text-red-300">
-                        {combat.monster.hp}/{combat.monster.maxHp}
-                      </span>
-                      <div className="w-8 h-1.5 bg-stone-900 rounded-full overflow-hidden border border-stone-800 hidden md:block">
+                  {/* Hero Stats & Mini Progress Bars */}
+                  <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                    {/* Hero HP with Mini Bar */}
+                    <div className="bg-[#100a06] px-2 py-1 rounded border border-stone-800 flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                          <Heart className="w-3 h-3 fill-emerald-400/20 shrink-0" />
+                          <span>HP</span>
+                        </div>
+                        <span className="text-emerald-300 font-bold">
+                          {hero.currentHp} / {hero.maxHp}
+                        </span>
+                      </div>
+                      <div className="w-full bg-stone-900 rounded-full h-1.5 border border-stone-800 overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-red-600 to-red-400"
-                          style={{ width: `${monsterHpPercent}%` }}
+                          className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full transition-all duration-300 rounded-full"
+                          style={{ width: `${hpPercent}%` }}
                         />
                       </div>
                     </div>
 
-                    {/* Enemy AC */}
-                    <div
-                      className="flex items-center gap-1 bg-[#20140c] px-2 py-0.5 rounded border border-stone-800"
-                      title={`${combat.monster.name} Armor Class: ${combat.monster.armorClass}`}
-                    >
-                      <Shield className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                      <span className="font-bold text-amber-300">AC {combat.monster.armorClass}</span>
-                    </div>
-
-                    {/* Enemy Modifier */}
-                    <div
-                      className="flex items-center gap-1 bg-[#20140c] px-2 py-0.5 rounded border border-stone-800"
-                      title={`Monster Attack Modifier: +${combat.monster.attackBonus}`}
-                    >
-                      <Sword className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span className="font-bold text-amber-300">
-                        {combat.monster.attackBonus >= 0 ? `+${combat.monster.attackBonus}` : combat.monster.attackBonus} Atk
-                      </span>
+                    {/* Hero Energy/Mana with Mini Bar */}
+                    <div className="bg-[#100a06] px-2 py-1 rounded border border-stone-800 flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1 text-cyan-400 font-bold">
+                          <Sparkles className="w-3 h-3 shrink-0" />
+                          <span>EP</span>
+                        </div>
+                        <span className="text-cyan-300 font-bold">
+                          {hero.currentMana} / {hero.maxMana}
+                        </span>
+                      </div>
+                      <div className="w-full bg-stone-900 rounded-full h-1.5 border border-stone-800 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full transition-all duration-300 rounded-full"
+                          style={{ width: `${mpPercent}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 min-w-0 justify-end">
-                    <span className="font-serif font-black text-red-200 text-xs sm:text-sm truncate max-w-[110px] sm:max-w-[150px]">
-                      {combat.monster.name}
-                    </span>
-                    {combat.monster.isBoss && (
-                      <span className="text-[9px] font-mono text-amber-300 bg-amber-950 border border-amber-600 px-1 rounded font-bold shrink-0">
-                        BOSS
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Clean Top Combat Header: Only icon, tile ref, and Combat title info (no duplicate HP, Mana, AC, Gold, or Return to Map button) */
-              <div className="flex items-center justify-between gap-3 animate-fadeIn">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#2d1c10] rounded-lg border border-[#6b4725] text-red-400 shrink-0">
-                    {getRoomHeaderIcon()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs bg-[#24150b] text-amber-400 px-2 py-0.5 rounded border border-[#523319] font-bold">
-                        Tile [{room.gridX + 1},{room.gridY + 1}]
-                      </span>
-                      <h2 className="text-base sm:text-lg font-serif font-black text-[#f5e4c6] leading-tight">
-                        Combat: {combat.monster.name}
-                      </h2>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-stone-400 font-serif">
-                      <span>Floor {floor.floorNumber}: {floor.floorName}</span>
-                      <span>•</span>
-                      <span className="text-red-400/90 font-mono text-[11px] font-semibold">
-                        Level {combat.monster.level} Threat
-                      </span>
-                      {combat.monster.isBoss && (
-                        <>
-                          <span>•</span>
-                          <span className="text-amber-400 font-mono text-[11px] font-bold">
-                            Floor Boss Chamber
+                  {/* Active Spell Buffs / Stances (if any) */}
+                  {hero.activeEffects && hero.activeEffects.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {hero.activeEffects.map((eff) => {
+                        let bonusText = '';
+                        if (eff.damageReduction) bonusText = `-${eff.damageReduction} Dmg`;
+                        else if (eff.armorModifier) bonusText = `+${eff.armorModifier} AC`;
+                        else if (eff.attackModifier) bonusText = `+${eff.attackModifier} Atk`;
+                        else if (eff.shieldHp) bonusText = `${eff.shieldHp} HP`;
+                        else if (eff.evasionBonus) bonusText = `75% Evade`;
+
+                        return (
+                          <span
+                            key={eff.id}
+                            title={eff.description}
+                            className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-950/80 text-blue-200 border border-blue-700/80 flex items-center gap-1 shadow-sm"
+                          >
+                            <Sparkles className="w-2.5 h-2.5 text-blue-400" />
+                            <span className="truncate max-w-[80px]">{eff.name}</span>
+                            {bonusText && <span className="text-amber-300">({bonusText})</span>}
+                            <span className="text-stone-400">[{eff.durationTurns}t]</span>
                           </span>
-                        </>
-                      )}
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-lg bg-red-950/80 border border-red-800 text-red-300 font-mono text-xs font-bold shadow-sm">
+                {/* Center: VS Badge & Round Counter (Col 6-7 on md+) */}
+                <div className="md:col-span-2 flex md:flex-col items-center justify-center gap-1.5 sm:gap-2 py-0.5">
+                  <span className="px-3 py-0.5 rounded-full bg-red-950 border-2 border-red-700 text-red-300 font-mono font-black text-xs shadow-md uppercase tracking-wider">
+                    VS
+                  </span>
+                  <span className="text-[10px] font-mono text-stone-400 font-bold bg-[#120a06] px-2 py-0.5 rounded border border-stone-800">
                     Round {combat.turnNumber}
                   </span>
                 </div>
+
+                {/* Right: Monster Combatant HUD (Col 8-12 on md+) */}
+                <div className="md:col-span-5 bg-[#1a110a] border border-red-900/60 rounded-xl p-2.5 flex flex-col gap-2 shadow-sm">
+                  {/* Monster Identity & AC/Atk */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Skull className="w-4 h-4 text-red-400 shrink-0" />
+                      <h3 className="font-serif font-black text-red-200 text-xs sm:text-sm truncate">
+                        {combat.monster.name}
+                      </h3>
+                      {combat.monster.isBoss ? (
+                        <span className="px-1.5 py-0.2 rounded bg-amber-950 border border-amber-600 text-amber-300 text-[9px] font-mono font-bold shrink-0">
+                          BOSS
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono text-red-400/80 shrink-0">
+                          Lvl {combat.monster.level}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Monster AC & Atk Modifiers */}
+                    <div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
+                      <div
+                        className="flex items-center gap-1 bg-[#100a06] px-1.5 py-0.5 rounded border border-stone-800"
+                        title={`Armor Class: ${combat.monster.armorClass}`}
+                      >
+                        <Shield className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                        <span className="font-bold text-amber-300">AC {combat.monster.armorClass}</span>
+                      </div>
+                      <div
+                        className="flex items-center gap-1 bg-[#100a06] px-1.5 py-0.5 rounded border border-red-950"
+                        title={`Attack Modifier: +${combat.monster.attackBonus}`}
+                      >
+                        <Sword className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="font-bold text-amber-300">
+                          {combat.monster.attackBonus >= 0 ? `+${combat.monster.attackBonus}` : combat.monster.attackBonus} Atk
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monster HP with Mini Bar */}
+                  <div className="bg-[#100a06] px-2 py-1 rounded border border-stone-800 flex flex-col gap-1 font-mono">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1 text-red-400 font-bold">
+                        <Heart className="w-3 h-3 fill-red-500/20 shrink-0" />
+                        <span>Monster Vitality</span>
+                      </div>
+                      <span className="text-red-300 font-bold">
+                        {combat.monster.hp} / {combat.monster.maxHp} HP
+                      </span>
+                    </div>
+                    <div className="w-full bg-stone-900 rounded-full h-1.5 border border-stone-800 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-red-700 via-red-600 to-amber-600 h-full transition-all duration-300 rounded-full"
+                        style={{ width: `${monsterHpPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-            )
+            </div>
           ) : (
             /* EXPLORATION HEADER (Non-Combat): Full Chamber Details + Hero Quick HUD + Return to Map */
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fadeIn">
