@@ -306,7 +306,7 @@ export const RulebookModal: React.FC<RulebookModalProps> = ({ onClose }) => {
                   Boss Chambers & Spiral Stairs
                 </h4>
                 <p className="text-[11px] text-stone-300">
-                  The spiral descent staircase is located at <strong>Chamber [4,4]</strong>, locked and guarded by the Floor Boss (Hobgoblin Chieftain on F1, Necromancer Lord on F2, Crimson Dragon on F3). Defeating the boss unlocks the stairs to descend.
+                  The spiral descent staircase is NOT in a fixed location — it is hidden alongside the Floor Boss in <strong>1 of 8 candidate chambers</strong> (marked with gold stars ★: [4,1], [4,2], [4,3], [4,4], [3,3], [3,4], [2,4], or [1,4]). You must scout and hunt around the dungeon to discover which candidate tile houses the boss (Hobgoblin Chieftain on F1, Necromancer Lord on F2, Crimson Dragon on F3). Defeating the boss unlocks the spiral stairs to descend.
                 </p>
               </div>
 
