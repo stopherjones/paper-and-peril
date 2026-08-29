@@ -153,7 +153,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     });
   }
 
-  if (combat?.heroDefending) {
+  if (combat?.heroDefending || combat?.heroCatchingBreath) {
     heroAc += 4;
   }
 
@@ -219,7 +219,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
                     >
                       <Shield className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                       <span className="font-bold text-blue-200">AC {heroAc}</span>
-                      {combat.heroDefending && (
+                      {(combat.heroDefending || combat.heroCatchingBreath) && (
                         <span className="text-[9px] text-emerald-300 bg-emerald-950 border border-emerald-600 px-1 rounded font-bold animate-pulse">
                           +4
                         </span>

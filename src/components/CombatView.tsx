@@ -24,6 +24,7 @@ import {
   Footprints,
   Check,
   Trophy,
+  Wind,
 } from 'lucide-react';
 import {
   CombatLogEntry,
@@ -139,8 +140,8 @@ export const CombatView: React.FC<CombatViewProps> = ({
     });
   }
 
-  if (combat.heroDefending) {
-    heroAc += 4; // Block stance
+  if (combat.heroDefending || combat.heroCatchingBreath) {
+    heroAc += 4; // Block stance / Catch Breath guard
   }
 
   // Active attack modifier from buffs (e.g. +3 Divine Favor)
@@ -771,12 +772,13 @@ export const CombatView: React.FC<CombatViewProps> = ({
     }, 600);
   };
 
-  // 4. HERO DEFEND STANCE & COUNTER-ATTACK (Costs 5 Energy)
+  // 4a. HERO DEFEND & COUNTER-ATTACK (Costs 5 Energy)
   const handleHeroDefend = () => {
     if (combatStep !== 'HERO_CHOICE' || hero.currentMana < 5) return;
     hero.currentMana -= 5;
     onUpdateHero({ ...hero });
     combat.heroDefending = true;
+    combat.heroCatchingBreath = false;
     sounds.playBlock();
 
     const shieldAbsorb = 3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0);
@@ -788,6 +790,29 @@ export const CombatView: React.FC<CombatViewProps> = ({
     });
 
     addLog('hero', guardProfile.actionName, `Spent 5 Energy: Raised defense (+4 AC, -${shieldAbsorb} dmg) & primed ${guardProfile.counterName}.`);
+    onUpdateCombat({ ...combat });
+    setCombatStep('HERO_NON_DAMAGE_RESULT');
+  };
+
+  // 4b. HERO CATCH BREATH (Costs 0 Energy, Replaces Counter Attack when <5 EP, Restores +2 EP, +4 AC, No Damage Counter)
+  const handleHeroCatchBreath = () => {
+    if (combatStep !== 'HERO_CHOICE') return;
+    const manaRecovered = Math.min(hero.maxMana - hero.currentMana, 2);
+    hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 2);
+    onUpdateHero({ ...hero });
+    combat.heroDefending = false;
+    combat.heroCatchingBreath = true;
+    sounds.playBlock();
+
+    const shieldAbsorb = 3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0);
+
+    setActionSummary({
+      title: `💨 Catch Breath & Guard (+${manaRecovered > 0 ? manaRecovered : 0} EP)`,
+      details: `🛡️ STAMINA RECOVERY & TACTICAL GUARD:\n• Cost: 0 EP (Free Exhaustion Recovery)\n• Energy Restored: +2 Energy Points (${hero.currentMana} / ${hero.maxMana} EP)\n• Fortified Defenses: +4 Armor Class (Your AC ${heroAc} ➔ ${heroAc + 4})\n• Damage Absorption: Absorbs ${shieldAbsorb} incoming monster damage\n• Pure Defense: Focusing entirely on recovery — does not deliver a counter-attack.`,
+      type: 'hero',
+    });
+
+    addLog('hero', 'Catch Breath & Guard', `Cost 0 EP: Restored +2 Energy (${hero.currentMana}/${hero.maxMana} EP). Fortified defense (+4 AC, -${shieldAbsorb} dmg) without counter-attack.`);
     onUpdateCombat({ ...combat });
     setCombatStep('HERO_NON_DAMAGE_RESULT');
   };
@@ -1084,7 +1109,8 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
           // Damage Reduction from Active Buffs (e.g. Aura of Protection -4, Iron Guard -3)
           const activeBuffDmgReduction = (hero.activeEffects || []).reduce((sum, eff) => sum + (eff.damageReduction || 0), 0);
-          const guardReduction = combat.heroDefending ? (3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)) : 0;
+          const isGuarding = combat.heroDefending || combat.heroCatchingBreath;
+          const guardReduction = isGuarding ? (3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)) : 0;
           const totalReduction = activeBuffDmgReduction + guardReduction;
 
           let dmgAfterReduction = Math.max(0, calculatedDmg - totalReduction);
@@ -1249,6 +1275,7 @@ export const CombatView: React.FC<CombatViewProps> = ({
 
       // End of round state updates
       combat.heroDefending = false;
+      combat.heroCatchingBreath = false;
       combat.turnNumber += 1;
 
       // Tick active buffs / status effects durations
@@ -1742,47 +1769,73 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   );
                 })()}
 
-                {/* 2. Defend Guard & Counter-Attack (5 Energy) */}
-                {(() => {
-                  const canAfford = hero.currentMana >= 5;
-                  return (
-                    <button
-                      id="btn-combat-defend"
-                      onClick={handleHeroDefend}
-                      disabled={!canAfford}
-                      className={`p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md ${
-                        canAfford
-                          ? 'bg-gradient-to-r from-blue-950/70 via-stone-900 to-stone-900 border-blue-600 hover:border-blue-300 cursor-pointer transform active:scale-98 group'
-                          : 'bg-stone-950/40 border-stone-800/80 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3 mb-2">
-                        <div className={`p-2 rounded-lg shrink-0 ${canAfford ? 'bg-blue-500/20 text-blue-400 group-hover:scale-110 transition-transform' : 'bg-stone-800 text-stone-500'}`}>
-                          <Shield className="w-5 h-5" />
+                {/* 2. Defend & Counter-Attack (5 EP) OR Catch Breath (0 EP, +2 EP, +4 AC, No Damage) when EP < 5 */}
+                {hero.currentMana >= 5 ? (
+                  <button
+                    id="btn-combat-defend"
+                    onClick={handleHeroDefend}
+                    className="p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md bg-gradient-to-r from-blue-950/70 via-stone-900 to-stone-900 border-blue-600 hover:border-blue-300 cursor-pointer transform active:scale-98 group"
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <div className="p-2 rounded-lg shrink-0 bg-blue-500/20 text-blue-400 group-hover:scale-110 transition-transform">
+                        <Shield className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-serif font-bold text-blue-200 text-sm flex items-center justify-between">
+                          <span>{guardProfile.actionName}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 bg-blue-950 text-blue-300 rounded border border-blue-800">
+                            5 EP
+                          </span>
                         </div>
-                        <div className="flex-1">
-                          <div className="font-serif font-bold text-blue-200 text-sm flex items-center justify-between">
-                            <span>{guardProfile.actionName}</span>
-                            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-blue-950 text-blue-300 rounded border border-blue-800">
-                              5 EP
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-blue-400/90 font-mono mt-0.5">
-                            {guardProfile.actionSubtitle}
-                          </div>
+                        <div className="text-[11px] text-blue-400/90 font-mono mt-0.5">
+                          {guardProfile.actionSubtitle}
                         </div>
                       </div>
-                      <div className="w-full bg-[#0d121a] p-1.5 rounded border border-[#1d2b40] text-[10px] font-mono text-stone-300 flex flex-col gap-0.5">
-                        <div>
-                          <span className="text-blue-300 font-bold">Defense:</span> Absorbs {3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)} dmg (+3 Base{hero.equipment.shield?.armorBonus ? ` +${hero.equipment.shield.armorBonus} Shield` : ''})
+                    </div>
+                    <div className="w-full bg-[#0d121a] p-1.5 rounded border border-[#1d2b40] text-[10px] font-mono text-stone-300 flex flex-col gap-0.5">
+                      <div>
+                        <span className="text-blue-300 font-bold">Defense:</span> +4 AC & Absorbs {3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)} dmg (+3 Base{hero.equipment.shield?.armorBonus ? ` +${hero.equipment.shield.armorBonus} Shield` : ''})
+                      </div>
+                      <div>
+                        <span className="text-amber-400 font-bold">⚔️ Retaliation:</span> Counter {guardProfile.counterName} ({guardProfile.counterFormula} + {guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} {guardProfile.counterStatKey})
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  <button
+                    id="btn-combat-catch-breath"
+                    onClick={handleHeroCatchBreath}
+                    className="p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md bg-gradient-to-r from-emerald-950/70 via-stone-900 to-stone-900 border-emerald-500 hover:border-emerald-300 cursor-pointer transform active:scale-98 group"
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <div className="p-2 rounded-lg shrink-0 bg-emerald-500/20 text-emerald-400 group-hover:scale-110 transition-transform">
+                        <Wind className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-serif font-bold text-emerald-200 text-sm flex items-center justify-between">
+                          <span>Catch Breath & Guard</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 bg-emerald-950 text-emerald-300 rounded border border-emerald-600 font-bold">
+                            +2 EP (0 Cost)
+                          </span>
                         </div>
-                        <div>
-                          <span className="text-amber-400 font-bold">⚔️ Retaliation:</span> Counter {guardProfile.counterName} ({guardProfile.counterFormula} + {guardProfile.counterBonus >= 0 ? `+${guardProfile.counterBonus}` : guardProfile.counterBonus} {guardProfile.counterStatKey})
+                        <div className="text-[11px] text-emerald-400/90 font-mono mt-0.5">
+                          Low Energy Recovery • +4 AC Defense
                         </div>
                       </div>
-                    </button>
-                  );
-                })()}
+                    </div>
+                    <div className="w-full bg-[#0d1512] p-1.5 rounded border border-[#143527] text-[10px] font-mono text-stone-300 flex flex-col gap-0.5">
+                      <div>
+                        <span className="text-emerald-300 font-bold">Stamina Recovery:</span> Regains +2 Energy (Current: {hero.currentMana}/{hero.maxMana} EP)
+                      </div>
+                      <div>
+                        <span className="text-blue-300 font-bold">Defensive Guard:</span> +4 AC & Absorbs {3 + (hero.equipment.shield?.armorBonus || hero.equipment.offhand?.armorBonus || 0)} dmg
+                      </div>
+                      <div className="text-stone-400 italic">
+                        🛡️ Focuses entirely on recovery (deals 0 counter damage)
+                      </div>
+                    </div>
+                  </button>
+                )}
 
                 {/* 3. Hero Spells & Class Skills */}
                 {hero.skills.map((skill) => {

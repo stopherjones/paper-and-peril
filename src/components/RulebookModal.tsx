@@ -282,10 +282,10 @@ export const RulebookModal: React.FC<RulebookModalProps> = ({ onClose }) => {
                 <div className="bg-[#140e09] p-3.5 rounded-xl border border-[#3e2b1c]">
                   <h4 className="text-cyan-300 font-bold text-xs mb-1.5 flex items-center gap-1.5">
                     <Eye className="w-4 h-4 text-cyan-400" />
-                    Peeking & Scouting
+                    Chamber Scouting & Vision
                   </h4>
                   <p className="text-[11px] text-stone-300">
-                    Click <em>Peek</em> on adjacent tiles or light a <strong>Torch / Spyglass</strong> to flip room cards face-up without stepping onto them. Cast <em>Scroll of Clairvoyance</em> to peek at any room anywhere on the board!
+                    Chambers remain dark and hidden until scouted. Light a <strong>Torch</strong> to reveal an adjacent room, use the reusable <strong>Burglar's Spyglass</strong> to scout without torches, or cast a <strong>Scroll of Clairvoyance</strong> to uncover any room anywhere on the 4x4 grid!
                   </p>
                 </div>
 
@@ -358,18 +358,28 @@ export const RulebookModal: React.FC<RulebookModalProps> = ({ onClose }) => {
 
                 <div className="bg-[#140e09] p-3 rounded-xl border border-stone-800">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-blue-300 text-xs">3. Tactical Defend Stance</span>
-                    <span className="font-mono text-[10px] text-blue-400 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-700">1 EP</span>
+                    <span className="font-bold text-blue-300 text-xs">3. Defend Guard & Counter-Attack</span>
+                    <span className="font-mono text-[10px] text-blue-400 bg-stone-900 px-1.5 py-0.5 rounded border border-blue-800">5 EP</span>
                   </div>
                   <p className="text-[11px] text-stone-300 mt-1">
-                    Brace your guard, granting <strong>+4 Armor Class (AC)</strong> against the monster's next incoming attack.
+                    Brace your guard for 5 EP, granting <strong>+4 Armor Class (AC)</strong>, absorbing incoming damage, and automatically launching a class-specific <strong>Counter-Attack</strong> retaliatory strike when the monster attacks!
                   </p>
                 </div>
 
                 <div className="bg-[#140e09] p-3 rounded-xl border border-stone-800">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-300 text-xs">4. Tactical Escape (Flee)</span>
-                    <span className="font-mono text-[10px] text-emerald-400 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-700">0 EP (Free)</span>
+                    <span className="font-bold text-emerald-300 text-xs">4. Catch Breath (Exhaustion Recovery)</span>
+                    <span className="font-mono text-[10px] text-emerald-400 bg-stone-900 px-1.5 py-0.5 rounded border border-emerald-700 font-bold">+2 EP (0 Cost)</span>
+                  </div>
+                  <p className="text-[11px] text-stone-300 mt-1">
+                    When your energy falls below 5 EP, <strong>Catch Breath</strong> automatically replaces the Counter-Attack option. It costs <strong>0 EP</strong>, recovers <strong>+2 Energy</strong>, grants <strong>+4 AC</strong>, and absorbs damage, focusing purely on defense without dealing counter damage.
+                  </p>
+                </div>
+
+                <div className="bg-[#140e09] p-3 rounded-xl border border-stone-800">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-300 text-xs">5. Tactical Escape (Flee)</span>
+                    <span className="font-mono text-[10px] text-amber-400 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-700">0 EP (Free)</span>
                   </div>
                   <p className="text-[11px] text-stone-300 mt-1">
                     Roll 1d20 + DEX/LCK vs <strong>Escape DC (10 + Monster Level)</strong>. Costs 0 EP. Success retreats you safely to the previous chamber. A Natural 1 fumble stumbles you and forfeits your next turn!

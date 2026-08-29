@@ -299,6 +299,7 @@ export interface CombatState {
   };
   combatLogs: CombatLogEntry[];
   heroDefending: boolean;
+  heroCatchingBreath?: boolean;
   heroStumbled?: boolean;
   monsterStumbled?: boolean;
   fledSuccessfully?: boolean;

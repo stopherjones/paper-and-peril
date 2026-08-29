@@ -933,7 +933,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                           ) : isClairvoyanceTargetCandidate ? (
                             <div className="flex flex-col items-center justify-center text-purple-300 animate-pulse">
                               <Eye className="w-4 h-4" />
-                              <span className="text-[7.5px] font-bold uppercase mt-0.5">Peek</span>
+                              <span className="text-[7.5px] font-bold uppercase mt-0.5">Scout</span>
                             </div>
                           ) : isSpyglassTargetCandidate ? (
                             <div className="flex flex-col items-center justify-center text-amber-300 animate-pulse">
@@ -969,7 +969,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
                             ) : room.isExplored ? (
                               <span className="text-stone-500">Seen</span>
                             ) : (
-                              <span className="text-cyan-300">Peeked</span>
+                              <span className="text-cyan-300">Scouted</span>
                             )
                           ) : isBossCandidate ? (
                             <span className="text-amber-500/90 font-serif">Candidate</span>
@@ -1172,7 +1172,7 @@ export const DungeonMap: React.FC<DungeonMapProps> = ({
             <p className="text-[11px] text-stone-300 mb-2.5">
               {selectedRoom.isRevealed
                 ? selectedInfo.description
-                : 'This room card lies face down. Peek at it with torches or spells, or enter directly to explore.'}
+                : 'This room card lies face down. Scout it with a Torch, Spyglass, or Clairvoyance spell, or enter directly to explore.'}
             </p>
 
             {/* Action Buttons for Selected Tile */}

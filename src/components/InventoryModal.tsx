@@ -628,7 +628,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         className="w-full py-2 bg-gradient-to-b from-[#4d2566] to-[#2e143d] hover:from-[#663187] hover:to-[#3e1b52] text-purple-100 font-serif font-bold text-xs rounded-lg border border-purple-400 shadow transition-all cursor-pointer flex items-center justify-center gap-2"
                       >
                         <Eye className="w-4 h-4 text-purple-300" />
-                        <span>Cast Clairvoyance ➔ Peek Any Map Tile [Single-use]</span>
+                        <span>Cast Clairvoyance ➔ Scout Any Map Tile [Single-use]</span>
                       </button>
                     )}
 
