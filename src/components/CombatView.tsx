@@ -792,11 +792,9 @@ export const CombatView: React.FC<CombatViewProps> = ({
     setCombatStep('HERO_NON_DAMAGE_RESULT');
   };
 
-  // 5. ATTEMPT FLEE ACTION (Costs 1 Energy)
+  // 5. ATTEMPT FLEE ACTION (Costs 0 Energy)
   const handleAttemptFlee = () => {
-    if (combatStep !== 'HERO_CHOICE' || hero.currentMana < 1) return;
-    hero.currentMana -= 1;
-    onUpdateHero({ ...hero });
+    if (combatStep !== 'HERO_CHOICE') return;
     setCombatStep('HERO_ATTACK_ROLLING');
     sounds.playDiceRoll();
 
@@ -1826,42 +1824,32 @@ export const CombatView: React.FC<CombatViewProps> = ({
                   );
                 })}
 
-                {/* 4. Attempt Tactical Escape (1 Energy) */}
-                {(() => {
-                  const canAfford = hero.currentMana >= 1;
-                  return (
-                    <button
-                      id="btn-combat-flee"
-                      onClick={handleAttemptFlee}
-                      disabled={!canAfford}
-                      className={`p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md ${
-                        canAfford
-                          ? 'bg-gradient-to-r from-stone-900 via-stone-900 to-stone-900 border-stone-700 hover:border-amber-400 cursor-pointer transform active:scale-98 group'
-                          : 'bg-stone-950/40 border-stone-800/80 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3 mb-2">
-                        <div className={`p-2 rounded-lg shrink-0 ${canAfford ? 'bg-stone-800 text-amber-300 group-hover:scale-110 transition-transform' : 'bg-stone-800 text-stone-500'}`}>
-                          <Footprints className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-serif font-bold text-stone-200 text-sm flex items-center justify-between">
-                            <span>Attempt Tactical Escape</span>
-                            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-stone-800 text-amber-300 rounded border border-stone-600">
-                              1 EP
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-stone-400 font-mono mt-0.5">
-                            Roll: 1d20 {fleeMod >= 0 ? `+ ${fleeMod}` : fleeMod} ({fleeMod >= 0 ? `+${fleeMod}` : fleeMod} {fleeStatKey}) vs DC {10 + monster.level}
-                          </div>
-                        </div>
+                {/* 4. Attempt Tactical Escape (0 Energy) */}
+                <button
+                  id="btn-combat-flee"
+                  onClick={handleAttemptFlee}
+                  className="p-3.5 border-2 rounded-xl text-left transition-all flex flex-col justify-between shadow-md bg-gradient-to-r from-stone-900 via-stone-900 to-stone-900 border-stone-700 hover:border-amber-400 cursor-pointer transform active:scale-98 group"
+                >
+                  <div className="flex items-start gap-3 mb-2">
+                    <div className="p-2 rounded-lg shrink-0 bg-stone-800 text-amber-300 group-hover:scale-110 transition-transform">
+                      <Footprints className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-serif font-bold text-stone-200 text-sm flex items-center justify-between">
+                        <span>Attempt Tactical Escape</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-emerald-950/80 text-emerald-300 rounded border border-emerald-700">
+                          0 EP (Free)
+                        </span>
                       </div>
-                      <div className="w-full bg-[#14120f] p-1.5 rounded border border-[#38332a] text-[10px] font-mono text-stone-300">
-                        <span className="text-amber-300 font-bold">Flee Rule:</span> DC {10 + monster.level} (Base 10 + Lvl {monster.level} Monster) • Retreats safely to previous chamber.
+                      <div className="text-[11px] text-stone-400 font-mono mt-0.5">
+                        Roll: 1d20 {fleeMod >= 0 ? `+ ${fleeMod}` : fleeMod} ({fleeMod >= 0 ? `+${fleeMod}` : fleeMod} {fleeStatKey}) vs DC {10 + monster.level}
                       </div>
-                    </button>
-                  );
-                })()}
+                    </div>
+                  </div>
+                  <div className="w-full bg-[#14120f] p-1.5 rounded border border-[#38332a] text-[10px] font-mono text-stone-300">
+                    <span className="text-amber-300 font-bold">Flee Rule:</span> DC {10 + monster.level} (Base 10 + Lvl {monster.level} Monster) • 0 EP Cost • Retreats safely to previous chamber.
+                  </div>
+                </button>
               </div>
 
               {/* Combat Consumables in Pack */}

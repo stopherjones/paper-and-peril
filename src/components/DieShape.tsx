@@ -88,7 +88,7 @@ interface DieShapeProps {
   isCrit?: boolean;
   isFumble?: boolean;
   isDropped?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   index?: number;
 }
@@ -108,6 +108,7 @@ export const DieShape: React.FC<DieShapeProps> = ({
 
   // Dimension scaling
   const sizeMap = {
+    xs: { width: 28, height: 28, fontSize: 'text-[11px]' },
     sm: { width: 44, height: 44, fontSize: 'text-sm' },
     md: { width: 68, height: 68, fontSize: 'text-2xl' },
     lg: { width: 92, height: 92, fontSize: 'text-4xl' },

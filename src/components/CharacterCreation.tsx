@@ -397,7 +397,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0906] text-amber-100 flex flex-col justify-between p-4 md:p-8 font-sans selection:bg-amber-800 selection:text-amber-100">
+    <div className="min-h-screen bg-[#0d0906] text-amber-100 flex flex-col justify-between p-3 sm:p-4 md:p-8 font-sans selection:bg-amber-800 selection:text-amber-100 overflow-x-hidden w-full max-w-full">
       {/* Header */}
       <header className="max-w-4xl mx-auto w-full text-center mb-6">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-800/60 text-amber-300 text-xs font-mono mb-2">
@@ -614,13 +614,13 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
           const allRolled = rolledCount === STAT_ORDER.length;
 
           return (
-            <div className="w-full max-w-3xl bg-[#18120c]/95 border-2 border-amber-800/60 rounded-xl p-5 shadow-2xl backdrop-blur-md text-amber-100 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-900/50 pb-4">
+            <div className="w-full max-w-3xl bg-[#18120c]/95 border-2 border-amber-800/60 rounded-xl p-3.5 sm:p-5 shadow-2xl backdrop-blur-md text-amber-100 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-900/50 pb-4">
                 <div>
-                  <span className="px-2.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-amber-400 font-mono text-xs tracking-wider uppercase">
+                  <span className="px-2.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-amber-400 font-mono text-[11px] sm:text-xs tracking-wider uppercase">
                     Step 2: Roll Ability Scores (4d6 Drop Lowest + Archetype Boost)
                   </span>
-                  <h3 className="text-xl font-bold font-serif text-amber-200 mt-1">
+                  <h3 className="text-lg sm:text-xl font-bold font-serif text-amber-200 mt-1">
                     Rolling Attributes for {selectedClass.name}
                   </h3>
                   <p className="text-xs text-stone-400 mt-0.5">
@@ -629,20 +629,20 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                 </div>
 
                 {/* Fate Tokens Indicator & Progress */}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-950/80 border border-purple-800 text-purple-300 text-xs font-mono">
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-purple-950/80 border border-purple-800 text-purple-300 text-xs font-mono">
                     <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                     <span>Fate Tokens: {fateTokens}</span>
                   </div>
 
-                  <div className="px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-900/60 text-amber-300 text-xs font-mono font-bold">
+                  <div className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-900/60 text-amber-300 text-xs font-mono font-bold">
                     {rolledCount}/5 Rolled
                   </div>
                 </div>
               </div>
 
               {/* Turn Sequence Steps Bar */}
-              <div className="grid grid-cols-5 gap-1.5 p-2 bg-stone-950/80 rounded-xl border border-amber-950">
+              <div className="grid grid-cols-5 gap-1 sm:gap-1.5 p-1.5 sm:p-2 bg-stone-950/80 rounded-xl border border-amber-950">
                 {STAT_ORDER.map((item, idx) => {
                   const isDone = rolledStatBreakdowns[item.key] !== undefined;
                   const isCurrent = nextStatToRoll?.key === item.key;
@@ -652,7 +652,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                   return (
                     <div
                       key={item.key}
-                      className={`text-center py-1.5 px-1 rounded-lg border text-xs font-mono transition-all ${
+                      className={`text-center py-1 sm:py-1.5 px-0.5 sm:px-1 rounded-lg border font-mono transition-all ${
                         isDone
                           ? 'bg-amber-950/40 border-amber-700/80 text-amber-200'
                           : isCurrent
@@ -660,10 +660,10 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                           : 'bg-stone-900/40 border-stone-800 text-stone-500'
                       }`}
                     >
-                      <div className="text-[10px] font-bold">
+                      <div className="text-[9px] sm:text-[10px] font-bold truncate">
                         {idx + 1}. {item.key} {bonus > 0 && <span className="text-amber-400">(+{bonus})</span>}
                       </div>
-                      <div className="text-xs font-black mt-0.5">
+                      <div className="text-[11px] sm:text-xs font-black mt-0.5">
                         {isDone ? `${val} (✓)` : isCurrent ? '➔ Roll' : 'Pending'}
                       </div>
                     </div>
@@ -673,34 +673,34 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
 
               {/* Active Stat Next-In-Turn Callout Banner */}
               {nextStatToRoll ? (
-                <div className="bg-gradient-to-r from-amber-950/80 via-stone-900 to-amber-950/80 border border-amber-600/70 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-600/20 border border-amber-500 text-amber-400 flex items-center justify-center font-serif font-black text-base animate-pulse shrink-0">
+                <div className="bg-gradient-to-r from-amber-950/80 via-stone-900 to-amber-950/80 border border-amber-600/70 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-600/20 border border-amber-500 text-amber-400 flex items-center justify-center font-serif font-black text-sm sm:text-base animate-pulse shrink-0">
                       {nextStatToRoll.key}
                     </div>
-                    <div>
-                      <div className="text-[11px] font-mono text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <span>Current Stat in Turn ({rolledCount + 1} of 5)</span>
+                    <div className="min-w-0">
+                      <div className="text-[10px] sm:text-[11px] font-mono text-amber-400 font-bold uppercase tracking-wider flex flex-wrap items-center gap-1">
+                        <span>Current Stat ({rolledCount + 1}/5)</span>
                         {(selectedClass.statBonuses?.[nextStatToRoll.key] || 0) > 0 && (
                           <span className="text-emerald-400 font-bold">
                             (+{selectedClass.statBonuses?.[nextStatToRoll.key]} {selectedClass.name} Boost)
                           </span>
                         )}
                       </div>
-                      <div className="text-sm md:text-base font-serif font-bold text-amber-100">
+                      <div className="text-xs sm:text-sm md:text-base font-serif font-bold text-amber-100 truncate">
                         Roll for {nextStatToRoll.label} (4d6 drop lowest + class bonus)
                       </div>
-                      <div className="text-xs text-stone-400">
+                      <div className="text-[11px] text-stone-400 truncate sm:whitespace-normal">
                         {nextStatToRoll.desc}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 justify-end shrink-0">
                     <button
                       id={`btn-roll-active-stat-${nextStatToRoll.key}`}
                       onClick={() => handleRollSingleStat(nextStatToRoll.key)}
                       disabled={isRollingCurrentStat}
-                      className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-stone-950 font-serif font-black rounded-lg text-xs md:text-sm flex items-center gap-2 shadow cursor-pointer transition-all shrink-0 hover:scale-105 active:scale-95 disabled:opacity-50"
+                      className="flex-1 sm:flex-initial px-3.5 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-stone-950 font-serif font-black rounded-lg text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 shadow cursor-pointer transition-all shrink-0 hover:scale-105 active:scale-95 disabled:opacity-50"
                     >
                       <Dices className="w-4 h-4" />
                       <span>Roll {nextStatToRoll.label}</span>
@@ -710,7 +710,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                         id="btn-fast-roll-all-stats"
                         onClick={handleRollAllStatsInTurn}
                         disabled={isRollingCurrentStat}
-                        className="px-3 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-300 font-mono text-xs rounded-lg border border-stone-600 flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                        className="px-2.5 sm:px-3 py-2 sm:py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-300 font-mono text-xs rounded-lg border border-stone-600 flex items-center justify-center gap-1 cursor-pointer transition-all disabled:opacity-50 shrink-0"
                         title="Roll all 5 stats automatically"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
@@ -776,7 +776,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                   return (
                     <div
                       key={statKey}
-                      className={`p-3 rounded-lg border transition-all ${
+                      className={`p-2.5 sm:p-3 rounded-lg border transition-all ${
                         isCurrentTurn
                           ? 'bg-[#2b1c10] border-amber-500 shadow-md ring-1 ring-amber-500/60'
                           : isPrimary
@@ -784,10 +784,11 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                           : 'bg-stone-950/60 border-stone-800'
                       }`}
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        {/* Left: Stat Name & Info */}
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-lg border flex items-center justify-center font-serif font-bold text-sm ${
+                      {/* Stat Header: Icon/Name + Badges on Left, Score on Right */}
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Left: Stat badge & Info */}
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg border flex items-center justify-center font-serif font-bold text-xs sm:text-sm shrink-0 ${
                             isCurrentTurn
                               ? 'bg-amber-600/30 border-amber-500 text-amber-200'
                               : isRolled
@@ -796,91 +797,94 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                           }`}>
                             {statKey}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-serif font-bold text-stone-200 text-sm">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+                              <span className="font-serif font-bold text-stone-200 text-xs sm:text-sm">
                                 {idx + 1}. {item.label}
                               </span>
                               {isPrimary && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-900/80 border border-amber-600 text-amber-300 uppercase">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold bg-amber-900/80 border border-amber-600 text-amber-300 uppercase">
                                   Primary (+{selectedClass.primaryStatBoost} Boost)
                                 </span>
                               )}
                               {!isPrimary && classBonus > 0 && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-950 border border-emerald-700 text-emerald-400 uppercase">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold bg-emerald-950 border border-emerald-700 text-emerald-400 uppercase">
                                   +{classBonus} Archetype
                                 </span>
                               )}
                               {isCurrentTurn && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/30 border border-amber-400 text-amber-300 uppercase animate-pulse">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold bg-amber-500/30 border border-amber-400 text-amber-300 uppercase animate-pulse">
                                   Active Turn
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-stone-400">{item.desc}</p>
+                            <p className="text-[10px] sm:text-[11px] text-stone-400 truncate sm:whitespace-normal">{item.desc}</p>
                           </div>
                         </div>
 
                         {/* Right: Score and Modifiers */}
-                        <div className="flex items-center gap-3">
-                          {isRolled ? (
-                            <div className="flex items-center gap-2">
+                        <div className="text-right pl-2 sm:pl-3 border-l border-stone-800 shrink-0 min-w-[48px] sm:min-w-[55px]">
+                          <div className="text-base sm:text-lg font-black font-mono text-cyan-300 leading-none">
+                            {isRolled ? value : '—'}
+                          </div>
+                          <div className="text-[9px] sm:text-[10px] font-mono text-amber-400 font-bold mt-0.5 whitespace-nowrap">
+                            {isRolled ? `${modifier >= 0 ? `+${modifier}` : modifier} Mod` : '—'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stat Bottom Actions: Dice Breakdown & Reroll OR Roll Button */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 mt-2 border-t border-stone-800/60">
+                        {isRolled ? (
+                          <div className="flex flex-wrap items-center justify-between w-full gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <div className="flex items-center gap-1" title="Rolled 4d6 (dimmed = dropped lowest)">
                                 {currentBreakdown.rolls.map((d, dIdx) => (
                                   <DieShape
                                     key={dIdx}
                                     sides={6}
                                     value={d}
-                                    size="sm"
+                                    size="xs"
                                     isDropped={d === currentBreakdown.dropped}
                                   />
                                 ))}
                               </div>
                               {currentBreakdown.classBonus > 0 && (
-                                <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800">
+                                <span className="text-[10px] sm:text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800">
                                   +{currentBreakdown.classBonus} Boost
                                 </span>
                               )}
-                              <button
-                                id={`btn-reroll-stat-${statKey}`}
-                                onClick={() => handleRollSingleStat(statKey, true)}
-                                disabled={isRollingCurrentStat || fateTokens <= 0}
-                                title="Spend Fate token to reroll this stat"
-                                className={`p-1.5 rounded transition-colors flex items-center gap-1 text-[11px] font-mono ${
-                                  fateTokens > 0
-                                    ? 'bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 cursor-pointer'
-                                    : 'bg-stone-900 text-stone-600 border border-stone-800 cursor-not-allowed'
-                                }`}
-                              >
-                                <RefreshCw className="w-3 h-3" />
-                                <span>Reroll</span>
-                              </button>
                             </div>
-                          ) : (
                             <button
-                              id={`btn-roll-stat-${statKey}`}
-                              onClick={() => handleRollSingleStat(statKey)}
-                              disabled={isRollingCurrentStat}
-                              className={`px-3 py-1.5 font-bold rounded text-xs flex items-center gap-1 cursor-pointer transition-colors ${
-                                isCurrentTurn
-                                  ? 'bg-amber-600 hover:bg-amber-500 text-stone-950 border border-amber-400 shadow animate-pulse'
-                                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700'
+                              id={`btn-reroll-stat-${statKey}`}
+                              onClick={() => handleRollSingleStat(statKey, true)}
+                              disabled={isRollingCurrentStat || fateTokens <= 0}
+                              title="Spend Fate token to reroll this stat"
+                              className={`px-2 py-1 rounded transition-colors flex items-center gap-1 text-[10px] sm:text-[11px] font-mono shrink-0 ${
+                                fateTokens > 0
+                                  ? 'bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 cursor-pointer'
+                                  : 'bg-stone-900 text-stone-600 border border-stone-800 cursor-not-allowed'
                               }`}
                             >
-                              <Dices className="w-3.5 h-3.5" />
-                              <span>Roll 4d6 {classBonus > 0 ? `(+${classBonus})` : ''}</span>
+                              <RefreshCw className="w-3 h-3" />
+                              <span>Reroll</span>
                             </button>
-                          )}
-
-                          <div className="text-right pl-3 border-l border-stone-800 min-w-[55px]">
-                            <div className="text-lg font-black font-mono text-cyan-300 leading-none">
-                              {isRolled ? value : '—'}
-                            </div>
-                            <div className="text-[10px] font-mono text-amber-400 font-bold mt-0.5">
-                              {isRolled ? `${modifier >= 0 ? `+${modifier}` : modifier} Mod` : '—'}
-                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <button
+                            id={`btn-roll-stat-${statKey}`}
+                            onClick={() => handleRollSingleStat(statKey)}
+                            disabled={isRollingCurrentStat}
+                            className={`px-3 py-1.5 font-bold rounded text-xs flex items-center gap-1 cursor-pointer transition-colors ${
+                              isCurrentTurn
+                                ? 'bg-amber-600 hover:bg-amber-500 text-stone-950 border border-amber-400 shadow animate-pulse'
+                                : 'bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700'
+                            }`}
+                          >
+                            <Dices className="w-3.5 h-3.5" />
+                            <span>Roll 4d6 {classBonus > 0 ? `(+${classBonus})` : ''}</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -888,7 +892,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
               </div>
 
               {/* Navigation Buttons */}
-              <div className="flex items-center justify-between border-t border-amber-900/50 pt-4 mt-4">
+              <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-amber-900/50 pt-4 mt-4">
                 <button
                   onClick={() => setCurrentStep('CLASS_SELECT')}
                   className="text-xs text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
@@ -903,7 +907,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
                       setCurrentStep('BOON_ROLL');
                     }
                   }}
-                  className={`px-6 py-2.5 font-serif font-black rounded-xl shadow-xl flex items-center gap-2 text-sm transition-all ${
+                  className={`w-full sm:w-auto px-5 sm:px-6 py-2.5 font-serif font-black rounded-xl shadow-xl flex items-center justify-center gap-2 text-xs sm:text-sm transition-all ${
                     allRolled
                       ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 text-stone-950 cursor-pointer transform hover:scale-105'
                       : 'bg-stone-900 border border-stone-800 text-stone-500 cursor-not-allowed'

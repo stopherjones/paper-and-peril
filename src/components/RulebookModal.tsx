@@ -369,10 +369,10 @@ export const RulebookModal: React.FC<RulebookModalProps> = ({ onClose }) => {
                 <div className="bg-[#140e09] p-3 rounded-xl border border-stone-800">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-emerald-300 text-xs">4. Tactical Escape (Flee)</span>
-                    <span className="font-mono text-[10px] text-emerald-400 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-700">1 EP</span>
+                    <span className="font-mono text-[10px] text-emerald-400 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-700">0 EP (Free)</span>
                   </div>
                   <p className="text-[11px] text-stone-300 mt-1">
-                    Roll 1d20 + DEX vs <strong>Escape DC (10 + Monster Level)</strong>. Success retreats you safely to the previous chamber. A Natural 1 fumble stumbles you and forfeits your next turn!
+                    Roll 1d20 + DEX/LCK vs <strong>Escape DC (10 + Monster Level)</strong>. Costs 0 EP. Success retreats you safely to the previous chamber. A Natural 1 fumble stumbles you and forfeits your next turn!
                   </p>
                 </div>
               </div>

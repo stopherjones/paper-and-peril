@@ -630,9 +630,9 @@ export default function App() {
   const currentRoom = currentFloorObj?.rooms[gameState.currentRoomId];
 
   return (
-    <div className="min-h-screen bg-[#140e08] text-[#f4ecd8] font-serif flex flex-col selection:bg-amber-800 selection:text-amber-100">
+    <div className="min-h-screen bg-[#140e08] text-[#f4ecd8] font-serif flex flex-col selection:bg-amber-800 selection:text-amber-100 overflow-x-hidden w-full max-w-full">
       {/* Top Medieval Header Bar */}
-      <header className="bg-[#21170f] border-b-2 border-[#6d4f32] px-4 py-2.5 shadow-md flex items-center justify-between sticky top-0 z-40">
+      <header className="bg-[#21170f] border-b-2 border-[#6d4f32] px-2.5 sm:px-4 py-2.5 shadow-md flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 bg-[#422c19] rounded border border-[#7d5836] text-amber-300">
             <Flame className="w-5 h-5 text-orange-400" />
