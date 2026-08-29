@@ -830,6 +830,19 @@ export default function App() {
         )}
       </main>
 
+      {/* Footer */}
+      <footer className="text-center text-xs text-stone-400 font-mono py-4 border-t border-stone-800/60 mt-6 shrink-0">
+        Open-source personal web project built by me, Chris Jones (stopherjones). For more information, see{' '}
+        <a
+          href="https://stopherjones.github.io/about.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
+        >
+          About Me
+        </a>
+      </footer>
+
       {/* Modals & Overlays */}
       {/* Full-Screen Room Exploration & Combat Pop-Up Modal */}
       {currentFloorObj && currentRoom && gameState.hero && (

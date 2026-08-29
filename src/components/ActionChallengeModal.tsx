@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldAlert,
@@ -68,6 +68,7 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
   const [step, setStep] = useState<'PREPARE' | 'ROLLING' | 'RESOLVED'>('PREPARE');
   const [rollResult, setRollResult] = useState<RollResult | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean | null>(null);
+  const bodyContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen && config) {
@@ -76,6 +77,12 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
       setIsSuccess(null);
     }
   }, [isOpen, config]);
+
+  useEffect(() => {
+    if (bodyContainerRef.current) {
+      bodyContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [step]);
 
   if (!isOpen || !config) return null;
 
@@ -166,7 +173,7 @@ export const ActionChallengeModal: React.FC<ActionChallengeModalProps> = ({
         </div>
 
         {/* Challenge Body */}
-        <div className="p-5 sm:p-6 space-y-5">
+        <div ref={bodyContainerRef} className="p-5 sm:p-6 space-y-5 max-h-[75vh] overflow-y-auto">
           {/* Context & Description */}
           <div className="bg-stone-950/60 border border-amber-900/50 rounded-xl p-4 text-xs sm:text-sm text-stone-200 leading-relaxed">
             <p className="font-serif">{config.subtitle}</p>

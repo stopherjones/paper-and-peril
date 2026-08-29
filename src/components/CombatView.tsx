@@ -111,8 +111,6 @@ export const CombatView: React.FC<CombatViewProps> = ({
     combat.monster.hp,
     hero.currentHp,
     actionSummary,
-    activeSpellChoice,
-    activeItemChoice,
   ]);
 
   const monster = combat.monster;
