@@ -1083,19 +1083,6 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacte
           </div>
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="text-center text-xs text-stone-400 font-mono mt-6 pb-2">
-        Open-source personal web project built by me, Chris Jones (stopherjones). For more information, see{' '}
-        <a
-          href="https://stopherjones.github.io/about.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
-        >
-          About Me
-        </a>
-      </footer>
     </div>
   );
 };
